@@ -49,10 +49,10 @@ wheelDistance = const(15.5) * cm
 wheelSensorDistance = const(6.8) * cm
 
 #Valoarea maxima si minima de viteza
-V0 = const(34)
-Vmax = const(92)
-V0rot = const(32)
-V0comp = const(36)
+V0 = const(35)
+Vmax = const(96)
+V0rot = const(35)
+V0comp = const(40)
 
 #Acceleratie si deceleratie mers fata spate
 AccelerationEncoder = const(80)
@@ -60,11 +60,11 @@ DecelerationEncoder = const(120)
 
 #Acceleratie di deceleratie rotiri
 AccelerationEncoderRot = const(10)
-DecelerationEncoderRot = const(60)
+DecelerationEncoderRot = const(70)
 
 #Acceleratie di deceleratie compas
 AccelerationEncoderComp = const(10)
-DecelerationEncoderComp = const(50)
+DecelerationEncoderComp = const(40)
 
 #Valori culori
 white = const(26)
@@ -92,18 +92,18 @@ kdSPB = const(0.5)
 kiSPB = const(0.001)
 
 #K-uri pentru Encoder MoveSync
-kpMS = const(2)
+kpMS = const(1)
 kdMS = const(0)
 kiMS = const(0)
 
 #K-uri pentru giroscop movesync
-kpANGMS = const(4)
+kpANGMS = const(3)
 kdANGMS = const(0)
 kiANGMS = const(0)
 
 #Axis-uri pentru giroscop
-TopAxis = const(Axis.Y)
-FrontAxis = const(-Axis.Z)
+TopAxis = Axis.Y
+FrontAxis = -Axis.Z
 
 #Directii
 STANGA = const(-1)
@@ -126,11 +126,6 @@ rotationTimer = const(279)
 
 #---Declarations----------------------------------------------------------------
 
-#Brick
-Brick = InventorHub(TopAxis, FrontAxis)
-InventorHub()
-Navigation = DriveBase(LeftMotor, RightMotor, wheelDiameter, wheelDistance)
-
 #Motoare
 LeftMotor = Motor(Port.A, Direction.COUNTERCLOCKWISE)
 RightMotor = Motor(Port.E)
@@ -139,6 +134,11 @@ LiftMotor = Motor(Port.D)
 
 LeftClawMotor = Motor(Port.B, Direction.COUNTERCLOCKWISE)
 RightClawMotor = Motor(Port.F)
+
+#Brick
+Brick = InventorHub(TopAxis, FrontAxis)
+InventorHub()
+Navigation = DriveBase(LeftMotor, RightMotor, wheelDiameter, wheelDistance)
 
 #Camera = ColorSensor(Port.C)
 
@@ -156,7 +156,8 @@ def deg2mm(degree: int) -> int:
 #end deg2mm
 
 def Init():
-    ClawMotor.reset_angle(0)
+    LeftClawMotor.reset_angle(0)
+    RightClawMotor.reset_angle(0)
     LiftMotor.reset_angle(0)
 #end init
 
@@ -262,6 +263,8 @@ def LFEncoder(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
         sens = 1
     #endif
 
+    speed = abs(speed)
+
     while(CurEncoder <= FinalEncoder):
         s1 = LeftSensor.reflection()
         s2 = RightSensor.reflection()
@@ -317,6 +320,8 @@ def LF2SIntersectionBlack(speed: int, intersections: int, accel: bool, aliniere:
 
     V = CurIntersections = Error = ErrorOld = ErrorSum = 0
     sens = 1
+
+    speed = abs(speed)
 
     while CurIntersections < intersections:
         s1 = LeftSensor.reflection()
@@ -381,6 +386,9 @@ def MoveSync(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
         sens = -1
     else:
         sens = 1
+    #endif
+
+    speed = abs(speed)
     
     while(abs(CurEncoder) <= abs(FinalEncoder)):
         LeftEncoder = LeftMotor.angle()
@@ -436,11 +444,10 @@ def MoveSync(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
 #end MoveSync
 
 def RobotSpin(speed: int, grade:float, direction: int, pid:bool, accel: bool, decel: bool, brake: bool):
-    FinalAngle = imux + grade * direction
-
     imux = Brick.imu.rotation(TopAxis)
     FirstAngle = CurAngle = imux
-    
+    FinalAngle = imux + grade * direction
+
     LeftMotor.reset_angle(0)
     RightMotor.reset_angle(0)
 
@@ -553,7 +560,7 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
     speedsemn = speed / abs(speed)
 
     imux = Brick.imu.rotation(TopAxis)
-    FinalAngle = imux - grade * direction * speedsemn
+    FinalAngle = imux + grade * direction * speedsemn
     FirstAngle = CurAngle = imux
 
     V = CurEncoder = Enc = 0
@@ -563,6 +570,8 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
     else:
         sens = -1
     #endif
+
+    speed = abs(speed)
 
     flag = 1
     
@@ -607,10 +616,10 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
         #endif
         
         if (direction == 1 and speed > 0) or (direction == -1 and speed < 0):
-            if(CurAngle <= FinalAngle):
+            if(CurAngle >= FinalAngle):
                 flag=0
         else:
-            if(CurAngle >= FinalAngle):
+            if(CurAngle <= FinalAngle):
                 flag=0
         #endif
 
@@ -625,9 +634,9 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
 
 def SMove(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool):
     RobotCompas(speed, grade, direction, accel, decel, brake)
-    wait(25)
+    wait(100)
     RobotCompas(speed, grade, 0 - direction, accel, decel, brake)
-    wait(25)
+    wait(100)
 
 # ┌ 𝙙𝙚 𝙛𝙪𝙣𝙘𝙩𝙞𝙖 𝙖𝙨𝙩𝙖 𝙣𝙪 𝙢𝙖 𝙖𝙩𝙞𝙣𝙜 ┐ -𝓿𝓵𝓪𝓭
 def RobotSpinWhite(speed: int, direction: int, endBrake: bool):
@@ -682,8 +691,9 @@ def MoveTime(speed: int, time: float, accel: bool, brake: bool):
         sens = -1
     #endif
 
-    V =  speed
     speed = abs(speed)
+
+    V =  speed
 
     while(timeWatch.time() < ms):
         LeftEncoder = LeftMotor.angle()
@@ -801,6 +811,8 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
         sens = 1
     #endif
 
+    speed = abs(speed)
+
     while(LeftSensor.reflection() < white and RightSensor.reflection() < white):
         LeftEncoder = LeftMotor.angle()
         RightEncoder = RightMotor.angle()
@@ -868,6 +880,8 @@ def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     else:
         sens = 1
     #endif
+
+    speed = abs(speed)
         
     while(abs(CurEncoder) <= abs(FinalEncoder)):
         LeftEncoder = LeftMotor.angle()
