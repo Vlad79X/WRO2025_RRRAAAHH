@@ -55,8 +55,8 @@ V0rot = const(35)
 V0comp = const(40)
 
 #Acceleratie si deceleratie mers fata spate
-AccelerationEncoder = const(80)
-DecelerationEncoder = const(120)
+AccelerationEncoder = const(150)
+DecelerationEncoder = const(80)
 
 #Acceleratie di deceleratie rotiri
 AccelerationEncoderRot = const(10)
@@ -69,11 +69,11 @@ DecelerationEncoderComp = const(40)
 #Valori culori
 white = const(26)
 black = const(12)
-grey = const(16)
+grey = const(35)
 
 #K-uri pentru LineFollower
-kpLF = const(1)
-kdLF = const(5)
+kpLF = const(0.17)
+kdLF = const(4.5)
 kiLF = const(0)
 
 #K-uri pentru Encoder RobotSpin
@@ -127,13 +127,13 @@ rotationTimer = const(279)
 #---Declarations----------------------------------------------------------------
 
 #Motoare
-LeftMotor = Motor(Port.A, Direction.COUNTERCLOCKWISE)
-RightMotor = Motor(Port.E)
+LeftMotor = Motor(Port.B, Direction.COUNTERCLOCKWISE)
+RightMotor = Motor(Port.C)
 
-LiftMotor = Motor(Port.D)
+LiftMotor = Motor(Port.A)
 
-LeftClawMotor = Motor(Port.B, Direction.COUNTERCLOCKWISE)
-RightClawMotor = Motor(Port.F)
+ClawMotor = Motor(Port.D)
+
 
 #Brick
 Brick = InventorHub(TopAxis, FrontAxis)
@@ -141,6 +141,7 @@ InventorHub()
 Navigation = DriveBase(LeftMotor, RightMotor, wheelDiameter, wheelDistance)
 
 #Camera = ColorSensor(Port.C)
+Sensor = ColorSensor(Port.F)
 
 #RotateTo(Color) PID Timer
 timerPIDBlack = StopWatch()
@@ -156,9 +157,10 @@ def deg2mm(degree: int) -> int:
 #end deg2mm
 
 def Init():
-    LeftClawMotor.reset_angle(0)
-    RightClawMotor.reset_angle(0)
+    Navigation.reset(0,0)
+    ClawMotor.reset_angle(0)
     LiftMotor.reset_angle(0)
+    run_task(clawGoTo(-250,1,0,500))
 #end init
 
 async def liftGoTo(degrees: float, kp: float, kd: float, time: int):
@@ -195,12 +197,8 @@ async def liftGoTo(degrees: float, kp: float, kd: float, time: int):
     LiftMotor.hold()
 #end liftGoTo
 
-async def clawGoTo(degrees: int, whichMotor, kpClaw: float, kdClaw: float, time: int):
+async def clawGoTo(degrees: int, kpClaw: float, kdClaw: float, time: int):
     timerClaw = StopWatch()
-
-    ClawMotor = LeftClawMotor
-    if(whichMotor == DREAPTA):
-        ClawMotor = RightClawMotor
 
     if abs(ClawMotor.angle()) > abs(degrees):
         case = 1
@@ -249,6 +247,61 @@ def CheckGyro():
     #endwhile
 #end CheckGyro
 
+def LF1SEncoder(speed: int, mm: float,sol, accel: bool, decel: bool, brake: bool):
+    #sol = Side Of Line (Stanga/Dreapta)
+
+    FinalEncoder = mm2deg(mm)
+
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
+
+    V = ErrorOld = ErrorSum = Error = CurEncoder = 0
+
+    while(CurEncoder <= FinalEncoder):
+        s = Sensor.reflection()
+
+        Error = (grey - s) * sol
+
+        LeftEncoder = LeftMotor.angle()
+        RightEncoder = RightMotor.angle()
+        CurEncoder = (LeftEncoder + RightEncoder) / 2
+
+        P = kpLF * Error
+        I = kiLF * ErrorSum
+        D = kdLF * (Error - ErrorOld)
+
+        ErrorOld = Error
+        ErrorSum = ErrorSum + Error
+
+        if accel == True:
+            if CurEncoder <= AccelerationEncoder:
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0) + V0)
+                V = min(max(V, V0rot), speed)
+            #endif
+        else:
+            V = speed
+        #endif
+
+        if decel == True:
+            if FinalEncoder - CurEncoder <= DecelerationEncoder :
+                V = abs(((FinalEncoder - CurEncoder) / DecelerationEncoder ) * ( speed - V0 * sens ) + V0 * sens)
+                V = min(max(V, V0rot), speed)
+            #endif
+        #endif
+        print(V + (P + I + D), V - (P + I + D),Error)
+        
+        LeftMotor.dc(V + (P + I + D))
+        RightMotor.dc(V - (P + I + D))
+
+
+    #endwhile
+    
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #endif
+#end LF1SEncoder
+
 def LFEncoder(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     FinalEncoder = mm2deg(mm)
 
@@ -256,6 +309,7 @@ def LFEncoder(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     RightMotor.reset_angle(0)
 
     V = ErrorOld = ErrorSum = Error = CurEncoder = 0
+    
 
     if (speed < 0):
         sens = -1
@@ -505,7 +559,6 @@ def RobotSpin(speed: int, grade:float, direction: int, pid:bool, accel: bool, de
 
     timerPID = StopWatch()
     time = rotationTimer
-
     error = errorSum = errorOld = 0
     exitCondition = 1
 
@@ -547,12 +600,116 @@ def RobotSpin(speed: int, grade:float, direction: int, pid:bool, accel: bool, de
     
 #end RobotSpin
 
+def goToHeading(speed: int, grade:float, accel: bool, decel: bool, brake: bool):
+    
+    imux = Brick.imu.rotation(TopAxis)
+    FirstAngle = CurAngle = imux
+    FinalAngle = imux + grade * direction
+
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
+
+    V = ErrorEncoder = ErrorEncoderSum = ErrorEncoderOld = ErrorAngle = ErrorAngleSum = ErrorAngleOld = CurEncoder = 0
+    flag = 1
+    
+    while(flag == 1 and LeftMotor.stalled() == False and RightMotor.stalled() == False):
+        LeftEncoder = abs(LeftMotor.angle())
+        RightEncoder = abs(RightMotor.angle())
+        ErrorEncoder = LeftEncoder - RightEncoder
+
+        CurAngle = Brick.imu.rotation(TopAxis)
+        AngleEncoder = CurAngle - FirstAngle
+        ErrorAngle = abs(FinalAngle - CurAngle)
+
+        Pe = kpSP * ErrorEncoder
+        Ie = kiSP * ErrorEncoderSum
+        De = kdSP * (ErrorEncoder - ErrorEncoderOld)
+        
+        ErrorEncoderOld = ErrorEncoder
+        ErrorEncoderSum = ErrorEncoderSum + ErrorEncoder
+
+        if accel == True:
+            if abs(AngleEncoder) <= AccelerationEncoderRot:
+                V = abs((abs(AngleEncoder) / AccelerationEncoderRot) * (speed - V0rot) + V0rot)
+                V = min(max(V, V0rot), speed)
+            #endif
+        else:
+            V = speed
+        #endif
+
+        if decel == True:
+            if (grade - abs(AngleEncoder)) <= DecelerationEncoderRot :
+                V = abs((grade - abs(AngleEncoder)) / DecelerationEncoderRot  * (speed - V0rot) + V0rot)
+                V = min(max(V, V0rot), speed)
+            #endif
+        #endif
+
+        speedL = ((V - (Pe + Ie + De)) * direction)
+        speedR = -((V + (Pe + Ie + De)) * direction) 
+
+        if(direction == 1):
+            RightMotor.dc(speedR)
+            LeftMotor.dc(speedL)
+        else:
+            LeftMotor.dc(speedL)
+            RightMotor.dc(speedR)
+        #endif
+
+        if(abs(AngleEncoder) >= grade):
+            flag=0
+        #endif
+
+    #endwhile
+
+    timerPID = StopWatch()
+    time = rotationTimer
+    print("PID ACUM")
+    error = errorSum = errorOld = 0
+    exitCondition = 1
+
+    while exitCondition == 1 and pid == True:
+        CurAngle = Brick.imu.rotation(TopAxis)
+        error = FinalAngle - CurAngle
+
+        vit = V0rot + 5
+
+        if(error < 0):
+            vit = V0rot
+        else:
+            vit = -V0rot
+        #endif
+
+        speedL = -vit
+        speedR = vit
+
+        if(direction == 1):
+            RightMotor.dc(speedR)
+            LeftMotor.dc(speedL)
+        else:
+            LeftMotor.dc(speedL)
+            RightMotor.dc(speedR)
+        #endif
+
+        if timerPID.time() > time or (abs(error) < 0.07 and timerPID.time() > 79):
+            exitCondition = 0
+        #endif
+
+    #endwhile
+
+    timerPID.pause()
+
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #endif
+    
+#end RobotSpin
+
+
 def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool):
     encoder = ((wheelDistance * 3.14) * grade ) / 360
     FinalEncoder = mm2deg(encoder)
 
-    LeftMotor.hold()
-    RightMotor.hold()
 
     LeftMotor.reset_angle()
     RightMotor.reset_angle()
@@ -615,7 +772,7 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
             RightMotor.dc(V)
         #endif
         
-        if (direction == 1 and speed > 0) or (direction == -1 and speed < 0):
+        if (direction == 1 and speed*sens > 0) or (direction == -1 and speed*sens < 0):
             if(CurAngle >= FinalAngle):
                 flag=0
         else:
@@ -626,8 +783,8 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
     #endwhile
     
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end RobotCompas
@@ -922,10 +1079,8 @@ def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
             #endif
         #endif
 
-        V = V * sens
-
-        LeftMotor.dc(V + (Pe + Ie + De + Pa + Ia + Da))
-        RightMotor.dc(V - (Pe + Ie + De + Pa + Ia + Da))
+        LeftMotor.dc(V*sens + (Pe + Ie + De + Pa + Ia + Da))
+        RightMotor.dc(V*sens - (Pe + Ie + De + Pa + Ia + Da))
 
     #endwhile
 
