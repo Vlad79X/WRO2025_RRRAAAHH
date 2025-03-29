@@ -45,14 +45,15 @@ LaSuta = const(10)
 
 #Specificatii robot
 wheelDiameter = const(8.16) * cm
-wheelDistance = const(15.5) * cm
-wheelSensorDistance = const(6.8) * cm
+wheelDistance = const(14) * cm
+wheelSensorDistance = const(11) * cm
 
 #Valoarea maxima si minima de viteza
 V0 = const(35)
 Vmax = const(96)
 V0rot = const(35)
 V0comp = const(40)
+V0arc = const(55)
 
 #Acceleratie si deceleratie mers fata spate
 AccelerationEncoder = const(150)
@@ -66,10 +67,13 @@ DecelerationEncoderRot = const(70)
 AccelerationEncoderComp = const(10)
 DecelerationEncoderComp = const(40)
 
+AccelerationEncoderArc = const(30)
+DecelerationEncoderArc = const(60)
+
 #Valori culori
 white = const(26)
 black = const(12)
-grey = const(35)
+grey = const(70)
 
 #K-uri pentru LineFollower
 kpLF = const(0.17)
@@ -85,6 +89,11 @@ kiSP = const(0.001)
 kpANG = const(0.1)
 kdANG = const(0.5)
 kiANG = const(0.0001)
+
+#K-uri pentru ARC
+kpARC = const(1)
+kdARC = const(1)
+kiARC = const(0.0001)
 
 #K-uri pentru Encoder RotateTo(Color)
 kpSPB = const(0.2)
@@ -246,6 +255,166 @@ def CheckGyro():
         wait(50)
     #endwhile
 #end CheckGyro
+
+def ArcMove(speedext: int, raza: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool):
+    imux = Brick.imu.rotation(Axis.Y)
+    speedsemn = speedext / abs(speedext)
+
+    ratio = abs((raza - wheelDistance/2)/(raza + wheelDistance/2))
+
+    speedint = speedext * ratio
+
+    V0compL = V0comp
+    V0compR = V0comp
+    
+    if(direction == STANGA):
+        V0compL = V0arc * ratio
+        V0compR = V0arc 
+        leftSpeed = speedint
+        rightSpeed = speedext
+    else:
+        V0compL = V0arc
+        V0compR = V0arc * ratio
+        leftSpeed = speedext
+        rightSpeed = speedint
+
+
+    FinalAngle = imux - grade * direction * speedsemn
+    LastAngle = imux
+    FirstAngle = imux
+
+    error = 0
+    error_old = 0
+    error_sum = 0
+
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
+
+    VLeft = leftSpeed
+    VRight = rightSpeed
+    CurAngle = imux
+    flag = 1
+
+    if leftSpeed > 0:
+        sens = 1
+    else:
+        sens = -1
+    
+    print(leftSpeed,rightSpeed)
+
+    while(flag == 1):
+        LastAngle = CurAngle
+        CurAngle = Brick.imu.rotation(Axis.Y)
+        AngleEncoder = CurAngle - FirstAngle
+        
+        if accel == True:
+            if abs(AngleEncoder) <= AccelerationEncoderArc:
+                VLeft = (abs(AngleEncoder) / AccelerationEncoderArc) * (leftSpeed - V0compL) + V0compL
+                if abs(VLeft) > abs(leftSpeed):
+                   VLeft = leftSpeed
+                #endif
+                if abs(VLeft) < abs(V0compL) :
+                    VLeft = V0compL * sens
+                #endif
+
+                VRight = (abs(AngleEncoder) / AccelerationEncoderArc) * (rightSpeed - V0compR) + V0compR
+                if abs(VRight) > abs(rightSpeed):
+                   VRight = rightSpeed
+                #endif
+                if abs(VRight) < abs(V0compR) :
+                    VRight = V0compR * sens
+                #endif
+            #endif
+        #endif
+
+        if decel == True:
+            if grade - abs(AngleEncoder) <= DecelerationEncoderArc :
+                VLeft = (( (grade - abs(AngleEncoder) ) / DecelerationEncoderArc ) * ( abs(leftSpeed) - V0compL ) + V0compL)*sens
+                if abs(VLeft) > abs(leftSpeed):
+                   VLeft = leftSpeed
+                #endif
+                if abs(VLeft) < abs(V0compL) :
+                    VLeft = V0compL * sens
+                #endif
+
+                VRight = (( (grade - abs(AngleEncoder) ) / DecelerationEncoderArc ) * ( abs(rightSpeed) - V0compR ) + V0compR)*sens
+                if abs(VRight) > abs(rightSpeed):
+                   VRight = rightSpeed
+                #endif
+                if abs(VRight) < abs(V0compR) :
+                    VRight = V0compR * sens
+                #endif
+            #endif
+        #endif
+
+        if leftSpeed == speedint:
+            error = LeftMotor.angle() - RightMotor.angle()*ratio
+        else:
+            error = LeftMotor.angle()*ratio - RightMotor.angle()
+
+        P = kpARC * error
+        D = kdARC * (error - error_old)
+        I = kiARC * error_sum
+
+        error_old = error
+        error_sum = error_sum + error
+
+        speedL = VLeft - (P + D + I)
+        speedR = VRight + (P + D + I)
+
+        
+        LeftMotor.dc(speedL)
+        RightMotor.dc(speedR)
+        print(CurAngle,FinalAngle,AngleEncoder,speedL,speedR)
+        # print(abs(AngleEncoder) + (CurAngle-LastAngle)/2,CurAngle,LastAngle)
+        
+        # if direction == 1 and leftSpeed > 0 or direction == -1 and leftSpeed < 0:
+        #     if(AngleEncoder <= grade):
+        #         flag=0
+        # else:
+        if(abs(AngleEncoder) >= grade or LeftMotor.stalled() or RightMotor.stalled()):
+            flag=0
+    #endwhile
+    timerPID = StopWatch()
+    time = rotationTimer
+    error = errorSum = errorOld = 0
+    exitCondition = 1
+
+    while exitCondition == 1:
+        CurAngle = Brick.imu.rotation(TopAxis)
+        error = FinalAngle - CurAngle
+
+        vit = V0rot + 5
+
+        if(error < 0):
+            vit = V0rot
+        else:
+            vit = -V0rot
+        #endif
+
+        speedL = -vit
+        speedR = vit
+
+        if(direction == 1):
+            RightMotor.dc(speedR)
+            LeftMotor.dc(speedL)
+        else:
+            LeftMotor.dc(speedL)
+            RightMotor.dc(speedR)
+        #endif
+
+        if timerPID.time() > time or (abs(error) < 0.07 and timerPID.time() > 79):
+            exitCondition = 0
+        #endif
+
+    #endwhile
+
+    timerPID.pause()
+    if brake == True:
+        LeftMotor.brake()
+        RightMotor.brake()
+    #endif
+#end ArcMoveSpeedAngle
 
 def LF1SEncoder(speed: int, mm: float,sol, accel: bool, decel: bool, brake: bool):
     #sol = Side Of Line (Stanga/Dreapta)
