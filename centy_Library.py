@@ -49,21 +49,21 @@ wheelDistance = const(14) * cm
 wheelSensorDistance = const(11) * cm
 
 #Valoarea maxima si minima de viteza
-V0 = const(35)
-Vmax = const(96)
+V0 = const(45)
+Vmax = const(95)
 V0rot = const(35)
-V0comp = const(40)
+V0comp = 40
 V0arc = const(55)
 
 #Acceleratie si deceleratie mers fata spate
 AccelerationEncoder = const(150)
-DecelerationEncoder = const(80)
+DecelerationEncoder = const(100)
 
-#Acceleratie di deceleratie rotiri
+#Acceleratie si deceleratie rotiri
 AccelerationEncoderRot = const(10)
 DecelerationEncoderRot = const(70)
 
-#Acceleratie di deceleratie compas
+#Acceleratie si deceleratie compas
 AccelerationEncoderComp = const(10)
 DecelerationEncoderComp = const(40)
 
@@ -71,9 +71,8 @@ AccelerationEncoderArc = const(30)
 DecelerationEncoderArc = const(60)
 
 #Valori culori
-white = const(26)
-black = const(12)
-grey = const(70)
+white = const(90)
+black = const(25)
 
 #K-uri pentru LineFollower
 kpLF = const(0.17)
@@ -121,9 +120,9 @@ DREAPTA = const(1)
 #State uri pt motoare:
 
 #Motor gheara
-CLOSED = const(170)
-SEMIOPEN = const(80)
-OPEN = const(-5)
+CLOSED = const(-200)
+SEMIOPEN = const(-100)
+OPEN = const(0)
 
 #Motor lift
 UP = const(50)
@@ -166,7 +165,8 @@ def deg2mm(degree: int) -> int:
 #end deg2mm
 
 def Init():
-    Navigation.reset(0,0)
+    Brick.imu.reset_heading(0)
+    wait(300)
     ClawMotor.reset_angle(0)
     LiftMotor.reset_angle(0)
     run_task(clawGoTo(-250,1,0,500))
@@ -416,7 +416,7 @@ def ArcMove(speedext: int, raza: int, grade: float, direction: int, accel: bool,
     #endif
 #end ArcMoveSpeedAngle
 
-def LF1SEncoder(speed: int, mm: float,sol, accel: bool, decel: bool, brake: bool):
+def LF1SEncoder(speed: int, mm: float,sol, accel: bool, decel: bool, brake: bool, grey: int):
     #sol = Side Of Line (Stanga/Dreapta)
 
     FinalEncoder = mm2deg(mm)
@@ -453,7 +453,7 @@ def LF1SEncoder(speed: int, mm: float,sol, accel: bool, decel: bool, brake: bool
 
         if decel == True:
             if FinalEncoder - CurEncoder <= DecelerationEncoder :
-                V = abs(((FinalEncoder - CurEncoder) / DecelerationEncoder ) * ( speed - V0 * sens ) + V0 * sens)
+                V = abs(((FinalEncoder - CurEncoder) / DecelerationEncoder ) * ( speed - V0) + V0)
                 V = min(max(V, V0rot), speed)
             #endif
         #endif
@@ -875,7 +875,7 @@ def goToHeading(speed: int, grade:float, accel: bool, decel: bool, brake: bool):
 #end RobotSpin
 
 
-def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool):
+def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool, turbo: int):
     encoder = ((wheelDistance * 3.14) * grade ) / 360
     FinalEncoder = mm2deg(encoder)
 
@@ -917,8 +917,8 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
 
         if accel == True:
             if abs(AngleEncoder) <= AccelerationEncoderComp:
-                V = abs((abs(AngleEncoder) / AccelerationEncoderComp) * (speed - V0comp) + V0comp)
-                V = min(max(V, V0rot), speed)
+                V = abs((abs(AngleEncoder) / AccelerationEncoderComp) * (speed - V0comp - turbo) + V0comp+ turbo)
+                V = min(max(V, V0comp), speed)
             #endif
         else:
             V = speed
@@ -926,8 +926,8 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
 
         if decel == True:
             if grade - abs(AngleEncoder) <= DecelerationEncoderComp :
-                V = abs(( (grade - abs(AngleEncoder) ) / DecelerationEncoderComp ) * ( abs(speed) - V0comp ) + V0comp)
-                V = min(max(V, V0rot), speed)
+                V = abs(( (grade - abs(AngleEncoder) ) / DecelerationEncoderComp ) * ( abs(speed) - V0comp - turbo ) + V0comp + turbo)
+                V = min(max(V, V0comp), speed)
             #endif
         #endif
         
@@ -959,9 +959,9 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
 #end RobotCompas
 
 def SMove(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool):
-    RobotCompas(speed, grade, direction, accel, decel, brake)
+    RobotCompas(speed, grade, direction, accel, decel, brake, 0)
     wait(100)
-    RobotCompas(speed, grade, 0 - direction, accel, decel, brake)
+    RobotCompas(speed, grade, 0 - direction, accel, decel, brake, 0)
     wait(100)
 
 # ┌ 𝙙𝙚 𝙛𝙪𝙣𝙘𝙩𝙞𝙖 𝙖𝙨𝙩𝙖 𝙣𝙪 𝙢𝙖 𝙖𝙩𝙞𝙣𝙜 ┐ -𝓿𝓵𝓪𝓭
@@ -1139,7 +1139,7 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
 
     speed = abs(speed)
 
-    while(LeftSensor.reflection() < white and RightSensor.reflection() < white):
+    while(LeftSensor.reflection() < white): #and RightSensor.reflection() < white):
         LeftEncoder = LeftMotor.angle()
         RightEncoder = RightMotor.angle()
         CurEncoder = (LeftEncoder + RightEncoder) / 2
@@ -1190,6 +1190,71 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
     #endif
 
 #end SquaringWhite
+
+def SquaringBlack(speed: int, black: int, accel: bool, aliniere: bool, brake: bool):
+    IniAngle = Brick.imu.rotation(TopAxis)
+    
+    V = ErrorEncoder = ErrorEncoderSum = ErrorEncoderOld = ErrorAngle = ErrorAngleSum = ErrorAngleOld = CurEncoder = 0
+
+    if speed < 0:
+        sens = -1
+    else:
+        sens = 1
+    #endif
+
+    speed = abs(speed)
+
+    while(Sensor.reflection() > black): #and RightSensor.reflection() > black):
+        LeftEncoder = LeftMotor.angle()
+        RightEncoder = RightMotor.angle()
+        CurEncoder = (LeftEncoder + RightEncoder) / 2
+        ErrorEncoder = LeftEncoder - RightEncoder
+
+        CurAngle = Brick.imu.rotation(TopAxis)
+        ErrorAngle = CurAngle - IniAngle
+
+        Pe = 0
+        Ie = 0     # 𝙗𝙪𝙩 𝙬𝙝𝙮
+        De = 0
+
+        ErrorEncoderOld = 0
+        ErrorEncoderSum = 0
+
+        Pa = kpANG * ErrorAngle
+        Ia = kiANG * ErrorAngleSum
+        Da = kdANG * (ErrorAngle - ErrorAngleOld)
+        
+        ErrorAngleOld = ErrorAngle
+        ErrorAngleSum = ErrorAngleSum + ErrorAngle
+
+        if accel == True:
+            if CurEncoder <= AccelerationEncoder:
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 * sens) + V0 * sens)
+                V = min(max(V, V0rot), speed)
+            #endif
+        else:
+            V = speed
+        #endif
+
+        V = V * sens
+
+        LeftMotor.dc(V + (Pe + Ie + De + Pa + Ia + Da))
+        RightMotor.dc(V - (Pe + Ie + De + Pa + Ia + Da))
+
+    #endwhile
+
+    if(aliniere == True):
+        Navigation.settings(straight_speed = speed * LaSuta)
+        Navigation.settings(straight_acceleration = speed * LaSuta)
+        Navigation.straight(wheelSensorDistance + 2*cm)
+    #endIf
+
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #endif
+
+#end SquaringBlack
 
 def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     FinalEncoder = mm2deg(mm)
