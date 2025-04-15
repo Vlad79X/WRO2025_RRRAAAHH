@@ -56,7 +56,7 @@ V0comp = 40
 V0arc = const(55)
 
 #Acceleratie si deceleratie mers fata spate
-AccelerationEncoder = const(150)
+AccelerationEncoder = const(250)
 DecelerationEncoder = const(100)
 
 #Acceleratie si deceleratie rotiri
@@ -1146,7 +1146,7 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
         ErrorEncoder = LeftEncoder - RightEncoder
 
         CurAngle = Brick.imu.rotation(TopAxis)
-        ErrorAngle = CurAngle - IniAngle
+        ErrorAngle = -(CurAngle - IniAngle)*sens
 
         Pe = 0
         Ie = 0     # 𝙗𝙪𝙩 𝙬𝙝𝙮
@@ -1164,17 +1164,15 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
 
         if accel == True:
             if CurEncoder <= AccelerationEncoder:
-                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 * sens) + V0 * sens)
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 ) + V0 )
                 V = min(max(V, V0rot), speed)
             #endif
         else:
             V = speed
         #endif
 
-        V = V * sens
-
-        LeftMotor.dc(V + (Pe + Ie + De + Pa + Ia + Da))
-        RightMotor.dc(V - (Pe + Ie + De + Pa + Ia + Da))
+        LeftMotor.dc((V + (Pe + Ie + De + Pa + Ia + Da))* sens)
+        RightMotor.dc((V - (Pe + Ie + De + Pa + Ia + Da))* sens)
 
     #endwhile
 
@@ -1211,7 +1209,7 @@ def SquaringBlack(speed: int, black: int, accel: bool, aliniere: bool, brake: bo
         ErrorEncoder = LeftEncoder - RightEncoder
 
         CurAngle = Brick.imu.rotation(TopAxis)
-        ErrorAngle = CurAngle - IniAngle
+        ErrorAngle = -(CurAngle - IniAngle) * sens
 
         Pe = 0
         Ie = 0     # 𝙗𝙪𝙩 𝙬𝙝𝙮
@@ -1229,17 +1227,15 @@ def SquaringBlack(speed: int, black: int, accel: bool, aliniere: bool, brake: bo
 
         if accel == True:
             if CurEncoder <= AccelerationEncoder:
-                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 * sens) + V0 * sens)
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 ) + V0 )
                 V = min(max(V, V0rot), speed)
             #endif
         else:
             V = speed
         #endif
 
-        V = V * sens
-
-        LeftMotor.dc(V + (Pe + Ie + De + Pa + Ia + Da))
-        RightMotor.dc(V - (Pe + Ie + De + Pa + Ia + Da))
+        LeftMotor.dc((V + (Pe + Ie + De + Pa + Ia + Da))*sens)
+        RightMotor.dc((V - (Pe + Ie + De + Pa + Ia + Da))*sens)
 
     #endwhile
 
@@ -1281,7 +1277,7 @@ def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
         ErrorEncoder = LeftEncoder - RightEncoder
 
         CurAngle = Brick.imu.rotation(TopAxis)
-        ErrorAngle = -(CurAngle - IniAngle)
+        ErrorAngle = -(CurAngle - IniAngle)*sens
 
         Pe = 0
         Ie = 0     # 𝙗𝙪𝙩 𝙬𝙝𝙮
@@ -1299,7 +1295,7 @@ def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
 
         if accel == True:
             if CurEncoder <= AccelerationEncoder:
-                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 * sens) + V0 * sens)
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 ) + V0)
                 V = min(max(V, V0rot), speed)
             #endif
         else:
@@ -1308,13 +1304,13 @@ def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
 
         if decel == True:
             if FinalEncoder - CurEncoder <= DecelerationEncoder :
-                V = abs(((FinalEncoder - CurEncoder) / DecelerationEncoder ) * (speed - V0 * sens) + V0 * sens)
+                V = abs(((FinalEncoder - CurEncoder) / DecelerationEncoder ) * (speed - V0) + V0)
                 V = min(max(V, V0rot), speed)
             #endif
         #endif
 
-        LeftMotor.dc(V*sens + (Pe + Ie + De + Pa + Ia + Da))
-        RightMotor.dc(V*sens - (Pe + Ie + De + Pa + Ia + Da))
+        LeftMotor.dc((V + (Pe + Ie + De + Pa + Ia + Da)) * sens)
+        RightMotor.dc((V - (Pe + Ie + De + Pa + Ia + Da)) * sens)
 
     #endwhile
 
