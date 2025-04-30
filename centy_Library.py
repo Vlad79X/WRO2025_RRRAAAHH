@@ -1139,7 +1139,7 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
 
     speed = abs(speed)
 
-    while(LeftSensor.reflection() < white): #and RightSensor.reflection() < white):
+    while(Sensor.reflection() < white): #and RightSensor.reflection() < white):
         LeftEncoder = LeftMotor.angle()
         RightEncoder = RightMotor.angle()
         CurEncoder = (LeftEncoder + RightEncoder) / 2
