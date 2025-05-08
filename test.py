@@ -1,11 +1,15 @@
 from centy_Library import *
 
+imux = Brick.imu.rotation(TopAxis)
+
 print(f"battery voltage : {Brick.battery.voltage()}")
+timer = StopWatch()
+Init()
+SquaringBlack(60,20,70*cm,0,0,0)
 
-#rn facem patratu ala mare cu parti colorate, 
+print(timer.time()/1000)
 
 
-print(Sensor.reflection())
 
 #rosu
 #print(Sensor.reflection())
