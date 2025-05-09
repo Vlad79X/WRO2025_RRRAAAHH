@@ -879,8 +879,8 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
     FinalEncoder = mm2deg(encoder)
 
 
-    LeftMotor.reset_angle()
-    RightMotor.reset_angle()
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
 
     speedsemn = speed / abs(speed)
 
@@ -1045,8 +1045,8 @@ def RobotSpinWhite(speed: int, direction: int, endBrake: bool):
 #end RobotSpinWhite
 
 def MoveTime(speed: int, time: float, accel: bool, brake: bool):
-    LeftMotor.reset_angle()
-    RightMotor.reset_angle()
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
     
     timeWatch = StopWatch()
     ms = time * 1000
