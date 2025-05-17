@@ -5,7 +5,7 @@ from pyhuskylens import HuskyLens, ALGORITHM_COLOR_RECOGNITION
 from servo import Servo
 import time
 
-def camVl(q_id):
+def camBl(q_id):
     for cur_id in range(1,5):
         blocks.append(huskylens.get_blocks(cur_id))
     
@@ -19,7 +19,7 @@ pr = PUPRemoteSensor(power=True)
 
 # command to get data from Huskylens based in ID of color
 # needs ID of color and returns 5 bytes of data
-pr.add_command('camVl',to_hub_fmt='80b',from_hub_fmt='')
+pr.add_command('camBl',to_hub_fmt='80b',from_hub_fmt='')
 
 pr.process() # Connect to hub
 

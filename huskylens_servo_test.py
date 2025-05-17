@@ -3,6 +3,7 @@ from pybricks.parameters import Port, Direction
 from pybricks.robotics import DriveBase
 from pybricks.pupdevices import Motor
 from pybricks.tools import wait
+from pyhuskylens import HuskyLens, ALGORITHM_COLOR_RECOGNITION
 import usys
 
 usys.stdout.write("\x1b[2J\x1b[H")
