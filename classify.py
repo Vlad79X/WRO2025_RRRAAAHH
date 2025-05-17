@@ -1,4 +1,11 @@
 import time
+from machine import Pin
+from machine import SoftI2C
+from pupremote import PUPRemoteSensor
+from pyhuskylens import HuskyLens, ALGORITHM_COLOR_RECOGNITION
+import time
+from servo import Servo
+from sys import getsizeof
 
 # ─── CONFIGURABLE TARGET POINTS ─────────────────────────────────────────
 TOP_Y     = -80    # Y position of top cubes (adjust on camera)
