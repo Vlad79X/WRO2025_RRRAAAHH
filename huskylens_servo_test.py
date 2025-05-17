@@ -2,8 +2,7 @@ from pupremote import PUPRemoteHub
 from pybricks.parameters import Port, Direction
 from pybricks.robotics import DriveBase
 from pybricks.pupdevices import Motor
-from pybricks.tools import wait
-from pyhuskylens import HuskyLens, ALGORITHM_COLOR_RECOGNITION
+from pybricks.tools import wait,StopWatch
 import usys
 
 usys.stdout.write("\x1b[2J\x1b[H")
@@ -14,7 +13,7 @@ pr = PUPRemoteHub(Port.B)
 # gets the blocks of the ID given
 # needs 1 parameter, the ID of the color
 # receives 5 parameters: X, Y, width, height and ID
-pr.add_command('camVl',to_hub_fmt='80b',from_hub_fmt='')
+pr.add_command('camBl',to_hub_fmt='20b',from_hub_fmt='b')
 
 # moves the servo
 # sends 2 paramters: servo pin number, degrees
@@ -70,16 +69,24 @@ def clean_blocks(blocks):
 def _euclidean_dist_sq(x1, y1, x2, y2):
     return (x1 - x2) ** 2 + (y1 - y2) ** 2
 
-def scan_color_corners_window(read_fn, window_ms=WINDOW_MS):
+def scan_color_corners_window(window_ms=WINDOW_MS):
     TL = [0] * 5  # votes[1-4] valid
     TR = [0] * 5
     BL = [0] * 5
     BR = [0] * 5
 
-    start = time.ticks_ms()
+    start = StopWatch()
 
-    while time.ticks_diff(time.ticks_ms(), start) < window_ms:
-        blocks = clean_blocks(read_fn())
+    while start.time() < window_ms:
+        blocks = []
+
+        for cid in range(1, 5):
+            raw = pr.call('camBl', cid)
+            wait(50)
+            blocks.extend(raw)
+        
+        print(blocks)
+        wait(5000)
 
         tl_dist, tr_dist = float('inf'), float('inf')
         bl_dist, br_dist = float('inf'), float('inf')
@@ -87,8 +94,10 @@ def scan_color_corners_window(read_fn, window_ms=WINDOW_MS):
         tl_cid, tr_cid = 0, 0
         bl_cid, br_cid = 0, 0
 
-        for b in blocks:
-            x, y, _, _, cid = b
+        for i in range(0,len(blocks),5):
+            if i+5 <= len(blocks):
+                x, y, wdt, hgt, cid = tuple(blocks[i:i+5])
+                print((x, y, wdt, hgt, cid))
 
             if cid == 0:
                 continue
@@ -138,6 +147,12 @@ def scan_color_corners_window(read_fn, window_ms=WINDOW_MS):
             br_count = BR[i]
             br_max = i
 
+    print()
+    print(TL)
+    print(TR)
+    print(BL)
+    print(BL)
+
     print(f"Color IDs per corner (after {window_ms} ms):")
     print("TL:", tl_max, "TR:", tr_max)
     print("BL:", bl_max, "BR:", br_max)
@@ -150,7 +165,5 @@ def scan_color_corners_window(read_fn, window_ms=WINDOW_MS):
     }
 
 
-while 1==1:
-    usys.stdout.write("\x1b[2J\x1b[H")
-    scan_color_corners_window(pr.call('camVl'))
-    wait(5000)
+usys.stdout.write("\x1b[2J\x1b[H")
+scan_color_corners_window()

@@ -7,7 +7,7 @@ import time
 
 # Set up Huskylens
 # Ensure Huskylens is in i2c mode via General Settings > Protocol Type
-time.sleep(400) # Wait for the Huskylens to boot
+time.sleep(2) # Wait for the Huskylens to boot
 i2c = SoftI2C(scl=Pin(20), sda=Pin(19)) # use only these pins for HuskyLens
 huskylens = HuskyLens(i2c)
 
@@ -16,21 +16,20 @@ huskylens.set_alg(ALGORITHM_COLOR_RECOGNITION) # set mode for camera
 huskylens.show_text("Connected LMS-ESP32 !")
 
 def camBl(q_id):
-    try:
-        blocks = []
-        for blk in huskylens.get_blocks():
-            blocks.extend([
-                blk.x & 0xFF,
-                blk.y & 0xFF,
-                blk.width & 0xFF,
-                blk.height & 0xFF,
-                blk.ID & 0xFF,
-            ])
-        blocks = (blocks + [1] * 80)[:80]
-        return blocks
-    except Exception as e:
-        print("camBl error:", e)
-        return [0]*80
+    blocks = huskylens.get_blocks(ID = q_id)
+    
+    if not blocks:
+        return [0] * 20
+    
+    i = 0
+    final_blocks = []
+    
+    while i < 4 and i < len(blocks):
+        b = blocks[i]
+        final_blocks.append(b.x,b.y,b.width,b.height,b.ID)
+        i += 1
+        
+    return final_blocks
 
 # Set up comms with SPIKE hub
 pr = PUPRemoteSensor(power=True)
@@ -40,10 +39,9 @@ pr = PUPRemoteSensor(power=True)
 
 # command to get data from Huskylens based in ID of color
 # needs ID of color and returns 5 bytes of data
-pr.add_command('camBl',to_hub_fmt='80b',from_hub_fmt='b')
-
-pr.process() # Connect to hub
+pr.add_command('camBl',to_hub_fmt='20b',from_hub_fmt='b')
 
 # must a forever loop to work
 while True:
     pr.process()
+

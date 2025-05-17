@@ -135,7 +135,7 @@ rotationTimer = const(279)
 #---Declarations----------------------------------------------------------------
 
 #Motoare
-LeftMotor = Motor(Port.B, Direction.COUNTERCLOCKWISE)
+LeftMotor = Motor(Port.E, Direction.COUNTERCLOCKWISE)
 RightMotor = Motor(Port.C)
 
 LiftMotor = Motor(Port.A)
@@ -149,7 +149,7 @@ InventorHub()
 Navigation = DriveBase(LeftMotor, RightMotor, wheelDiameter, wheelDistance)
 
 #Camera = ColorSensor(Port.C)
-Sensor = ColorSensor(Port.F)
+#Sensor = ColorSensor(Port.F)
 
 #RotateTo(Color) PID Timer
 timerPIDBlack = StopWatch()
