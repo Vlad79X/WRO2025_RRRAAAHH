@@ -24,6 +24,7 @@
 #
 # Enjoy coding with Pybricks and SPIKE!
 
+from pupremote import PUPRemoteHub
 from pybricks.hubs import InventorHub
 from pybricks.pupdevices import Motor, ColorSensor, UltrasonicSensor
 from pybricks.parameters import Axis,Button, Color, Direction, Port, Side, Stop
@@ -31,6 +32,7 @@ from pybricks.robotics import DriveBase
 from pybricks.hubs import PrimeHub
 from pybricks.tools import wait, StopWatch, multitask, run_task
 from micropython import const
+from ustruct import calcsize
 from umath import ceil
 
 #---Global_Values/Variables-----------------------------------------------------
@@ -78,6 +80,11 @@ black = const(25)
 kpLF = const(0.19)
 kdLF = const(4.5)
 kiLF = const(0)
+
+#K-uri pentru LineFollower cu Senzorii 3 si 5
+kpLFSA = const(0.17)
+kdLFSA = const(1.2)
+kiLFSA = const(0)
 
 #K-uri pentru Encoder RobotSpin
 kpSP = const(0.5)
@@ -135,10 +142,10 @@ rotationTimer = const(279)
 #---Declarations----------------------------------------------------------------
 
 #Motoare
-LeftMotor = Motor(Port.E, Direction.COUNTERCLOCKWISE)
+LeftMotor = Motor(Port.A, Direction.COUNTERCLOCKWISE)
 RightMotor = Motor(Port.C)
 
-LiftMotor = Motor(Port.A)
+LiftMotor = Motor(Port.E)
 
 ClawMotor = Motor(Port.D)
 
@@ -154,6 +161,18 @@ Navigation = DriveBase(LeftMotor, RightMotor, wheelDiameter, wheelDistance)
 #RotateTo(Color) PID Timer
 timerPIDBlack = StopWatch()
 
+pr = PUPRemoteHub(Port.B)
+# Line Tracker commands
+pr.add_command('lfall', to_hub_fmt='BBBBBBB', from_hub_fmt='')
+pr.add_command('lfone', to_hub_fmt='B',        from_hub_fmt='B')
+pr.add_command('lftwo', to_hub_fmt='BB',       from_hub_fmt='BB')
+pr.add_command('lftre', to_hub_fmt='BBB',      from_hub_fmt='BBB')
+pr.add_command('lfacl', from_hub_fmt='repr')
+pr.add_command('lficl', from_hub_fmt='repr')
+
+# HuskyLens: closest block to (x, y)
+pr.add_command('camCl', to_hub_fmt='B', from_hub_fmt='2H')
+
 #---Functions-------------------------------------------------------------------
 
 def mm2deg(mm: int) -> int:
@@ -167,9 +186,10 @@ def deg2mm(degree: int) -> int:
 def Init():
     Brick.imu.reset_heading(0)
     wait(300)
-    ClawMotor.reset_angle(0)
     LiftMotor.reset_angle(0)
+    ClawMotor.reset_angle(0)
     run_task(clawGoTo(-250,1,0,500))
+
 #end init
 
 async def liftGoTo(degrees: float, kp: float, kd: float, time: int):
@@ -532,6 +552,70 @@ def LFEncoder(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     #endif
 
 #end LFEncoder
+
+def LFEncoderSA(speed: int, mm: float, sensor1: int, sensor2: int, color: str, accel: bool, decel: bool, brake: bool):
+    FinalEncoder = mm2deg(mm)
+
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
+
+    V = ErrorOld = ErrorSum = Error = CurEncoder = 0
+    
+
+    if (speed < 0):
+        sens = -1
+    else:
+        sens = 1
+    #endif
+
+    speed = abs(speed)
+    pr.call('lfacl', color)
+
+    while(CurEncoder <= FinalEncoder):
+        s1, s2 = pr.call('lftwo', sensor1, sensor2)
+        Error = (s1 - s2)
+        # print(Error)
+
+        LeftEncoder = LeftMotor.angle()
+        RightEncoder = RightMotor.angle()
+        CurEncoder = (LeftEncoder + RightEncoder) / 2
+
+        P = kpLFSA * Error
+        I = kiLFSA * ErrorSum
+        D = kdLFSA * (Error - ErrorOld)
+
+        ErrorOld = Error
+        ErrorSum = ErrorSum + Error
+
+        if accel == True:
+            if CurEncoder <= AccelerationEncoder:
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 * sens) + V0 * sens)
+                V = min(max(V, V0rot), speed)
+            #endif
+        else:
+            V = speed
+        #endif
+
+        if decel == True:
+            if FinalEncoder - CurEncoder <= DecelerationEncoder :
+                V = abs(((FinalEncoder - CurEncoder) / DecelerationEncoder ) * ( speed - V0 * sens ) + V0 * sens)
+                V = min(max(V, V0rot), speed)
+            #endif
+        #endif
+
+        V = V * sens
+
+        LeftMotor.dc(V + (P + I + D))
+        RightMotor.dc(V - (P + I + D))
+
+    #endwhile
+    
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #endif
+
+#end LFEncoderSA
 
 def LF2SIntersectionBlack(speed: int, intersections: int, accel: bool, aliniere: bool, brake: bool):
     LeftMotor.reset_angle(0)
@@ -1228,6 +1312,75 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
 
 #end SquaringWhite
 
+def SquaringWhiteSA(speed: int, whiteV: int, sensor: int, color: str, accel: bool, aliniere: bool, brake: bool):
+    IniAngle = Brick.imu.rotation(TopAxis)
+    
+    V = ErrorEncoder = ErrorEncoderSum = ErrorEncoderOld = ErrorAngle = ErrorAngleSum = ErrorAngleOld = CurEncoder = 0
+
+    if speed < 0:
+        sens = -1
+    else:
+        sens = 1
+    #endif
+
+    speed = abs(speed)
+    pr.call('lfacl', color)
+
+    s = pr.call('lfone', sensor)
+    print(s)
+    while(s < whiteV):
+        s = pr.call('lfone', sensor)
+        print(s)
+        LeftEncoder = LeftMotor.angle()
+        RightEncoder = RightMotor.angle()
+        CurEncoder = (LeftEncoder + RightEncoder) / 2
+        ErrorEncoder = LeftEncoder - RightEncoder
+
+        CurAngle = Brick.imu.rotation(TopAxis)
+        ErrorAngle = -(CurAngle - IniAngle)*sens
+
+        Pe = 0
+        Ie = 0     # 𝙗𝙪𝙩 𝙬𝙝𝙮
+        De = 0
+
+        ErrorEncoderOld = 0
+        ErrorEncoderSum = 0
+
+        Pa = (kpANG+10) * ErrorAngle
+        Ia = kiANG * ErrorAngleSum
+        Da = kdANG * (ErrorAngle - ErrorAngleOld)
+        
+        ErrorAngleOld = ErrorAngle
+        ErrorAngleSum = ErrorAngleSum + ErrorAngle
+
+        if accel == True:
+            if CurEncoder <= AccelerationEncoder:
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 ) + V0 )
+                V = min(max(V, V0rot), speed)
+            #endif
+        else:
+            V = speed
+        #endif
+
+        LeftMotor.dc((V + (Pe + Ie + De + Pa + Ia + Da))* sens)
+        RightMotor.dc((V - (Pe + Ie + De + Pa + Ia + Da))* sens)
+
+    #endwhile
+
+    if(aliniere == True):
+        Navigation.settings(straight_speed = speed * LaSuta)
+        Navigation.settings(straight_acceleration = speed * LaSuta)
+        Navigation.straight(wheelSensorDistance + 2*cm)
+    #endIf
+
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #endif
+
+#end SquaringWhiteSA
+
+
 def SquaringBlack(speed: int, black: int, maxcm:float, accel: bool, aliniere: bool, brake: bool):
     IniAngle = Brick.imu.rotation(TopAxis)
     FinalEncoder = mm2deg(maxcm)
@@ -1291,6 +1444,73 @@ def SquaringBlack(speed: int, black: int, maxcm:float, accel: bool, aliniere: bo
     #endif
 
 #end SquaringBlack
+
+def SquaringBlackSA(speed: int, blackV: int, sensor:int, color: str, maxcm:float, accel: bool, aliniere: bool, brake: bool):
+    IniAngle = Brick.imu.rotation(TopAxis)
+    FinalEncoder = mm2deg(maxcm)
+    
+    V = ErrorEncoder = ErrorEncoderSum = ErrorEncoderOld = ErrorAngle = ErrorAngleSum = ErrorAngleOld = CurEncoder = 0
+
+    if speed < 0:
+        sens = -1
+    else:
+        sens = 1
+    #endif
+
+    speed = abs(speed)
+    pr.call('lfacl', color)
+
+    s = pr.call('lfone', sensor)
+    while(s > blackV and abs(CurEncoder) < abs(FinalEncoder)):
+        s = pr.call('lfone', sensor)
+        LeftEncoder = LeftMotor.angle()
+        RightEncoder = RightMotor.angle()
+        CurEncoder = (LeftEncoder + RightEncoder) / 2
+        ErrorEncoder = LeftEncoder - RightEncoder
+
+        CurAngle = Brick.imu.rotation(TopAxis)
+        ErrorAngle = -(CurAngle - IniAngle) * sens
+
+        Pe = 0
+        Ie = 0     # 𝙗𝙪𝙩 𝙬𝙝𝙮
+        De = 0
+
+        ErrorEncoderOld = 0
+        ErrorEncoderSum = 0
+
+        Pa = (kpANG+10) * ErrorAngle
+        Ia = kiANG * ErrorAngleSum
+        Da = kdANG * (ErrorAngle - ErrorAngleOld)
+        
+        ErrorAngleOld = ErrorAngle
+        ErrorAngleSum = ErrorAngleSum + ErrorAngle
+
+        if accel == True:
+            if CurEncoder <= AccelerationEncoder:
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 ) + V0 )
+                V = min(max(V, V0rot), speed)
+            #endif
+        else:
+            V = speed
+        #endif
+
+        LeftMotor.dc((V + (Pe + Ie + De + Pa + Ia + Da))*sens)
+        RightMotor.dc((V - (Pe + Ie + De + Pa + Ia + Da))*sens)
+
+    #endwhile
+
+    if(aliniere == True):
+        Navigation.settings(straight_speed = speed * LaSuta)
+        Navigation.settings(straight_acceleration = speed * LaSuta)
+        Navigation.straight(wheelSensorDistance + 2*cm)
+    #endIf
+
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #endif
+
+#end SquaringBlackS4
 
 def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     FinalEncoder = mm2deg(mm)
@@ -1431,37 +1651,36 @@ def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, cl
         RightMotor.hold()
     #endif
 
-def GetSwitchesAndCase(cub1:chr,cub2:chr,cub3:chr,cub4:chr):
+def GetSwitchesAndCase(cub1:int,cub2:int,cub3:int,cub4:int):
     switchleftright1 = False
     switchleftright2 = False
     switchinsideoutside = False
     caz = "drept"
-    if ((cub1 == 'g' and cub2 == 'r') or (cub1 == 'r' and cub2 == 'g')) or ((cub1 == 'v' and cub2 == 'a') or (cub1 == 'v' and cub2 == 'a')):
+    if ((cub1 == 4 and cub2 == 2) or (cub1 == 2 and cub2 == 4)) or ((cub1 == 1 and cub2 == 3) or (cub1 == 3 and cub2 == 1)):
         caz = "lateral"
-        if (cub1 == 'r' and cub2 == 'g') or (cub1 == 'v' and cub2 == 'a'):
+        if (cub1 == 2 and cub2 == 4) or (cub1 == 1 and cub2 == 3):
             switchleftright1 = True
-        if (cub3 == 'g' and cub4 == 'r') or (cub3 == 'a' and cub4 == 'v'):
+        if (cub3 == 4 and cub4 == 2) or (cub3 == 3 and cub4 == 1):
             switchleftright2 = True
-        if (cub1 == 'g' and cub2 == 'r') or (cub1 == 'r' and cub2 == 'g'):
+        if (cub1 == 4 and cub2 == 2) or (cub1 == 2 and cub2 == 4):
             switchinsideoutside = True
-    if ((cub1 == 'a' and cub2 == 'r') or (cub1 == 'r' and cub2 == 'a')) or ((cub1 == 'g' and cub2 == 'v') or (cub1 == 'v' and cub2 == 'g')):
+    if ((cub1 == 3 and cub2 == 2) or (cub1 == 2 and cub2 == 3)) or ((cub1 == 4 and cub2 == 1) or (cub1 == 1 and cub2 == 4)):
         caz = "diagonal"
-        if (cub1 == 'a' and cub2 == 'r') or (cub1 == 'v' and cub2 == 'g'):
+        if (cub1 == 3 and cub2 == 2) or (cub1 == 1 and cub2 == 4):
             switchleftright1 = True
-        if (cub3 == 'v' and cub4 == 'g') or (cub3 == 'r' and cub4 == 'a'):
+        if (cub3 == 1 and cub4 == 4) or (cub3 == 2 and cub4 == 3):
             switchleftright2 = True
-        if (cub3 == 'g' and cub4 == 'v') or (cub3 == 'v' and cub4 == 'g'):
+        if (cub3 == 4 and cub4 == 1) or (cub3 == 1 and cub4 == 4):
             switchinsideoutside = True
     if caz == "drept":
-        if (cub1 == 'r' and cub2 == 'v') or (cub1 == 'g' and cub2 == 'a'):
+        if (cub1 == 2 and cub2 == 1) or (cub1 == 4 and cub2 == 3):
             switchleftright1 = True
-        if (cub3 == 'v' and cub4 == 'r') or (cub3 == 'a' and cub4 == 'g'):
+        if (cub3 == 1 and cub4 == 2) or (cub3 == 3 and cub4 == 4):
             switchleftright2 = True
-        if (cub1 == 'a' and cub2 == 'g') or (cub1 == 'g' and cub2 == 'a'):
+        if (cub1 == 3 and cub2 == 4) or (cub1 == 4 and cub2 == 3):
             switchinsideoutside = True
     
-    return switchleftright1,switchleftright2,switchinsideoutside,caz
-            
+    return switchleftright1,switchleftright2,switchinsideoutside,caz            
             
 
 #end MoveSyncGyro
@@ -1507,8 +1726,8 @@ def Cazuri(caz: str,mistake:float, imux: float):
         MoveSyncGyro(80,3.5*cm,1,1,1)
         wait(50)
         RobotCompas(70, 87, STANGA, 0, 1, 1, 0)
-        wait(100)
-        LF1SEncoder(55, 13*cm, DREAPTA, 1, 0, 0, 85)
+        wait(2000)
+        LFEncoderSA(60,13*cm,3,5,"red",1,0,0)
         MoveSyncGyro(60,7.5*cm,0,1,1)
         wait(50)
         run_task(clawGoTo(CLOSED,1,0,500))
@@ -1581,7 +1800,7 @@ def Cazuri(caz: str,mistake:float, imux: float):
         wait(50)
         RobotCompas(70, 87, STANGA, 0, 1, 1, 0)
         wait(100)
-        LF1SEncoder(55, 13*cm, DREAPTA, 1, 0, 0, 85)
+        LFEncoderSA(60,13*cm,3,5,"red",1,0,0)
         MoveSyncGyro(60,7.5*cm,0,1,1)
         wait(50)
         run_task(clawGoTo(CLOSED,1,0,500))
@@ -1648,3 +1867,31 @@ def Cazuri(caz: str,mistake:float, imux: float):
 #endif
 #end Cazuri
     
+def compute_wait_ms(fps, from_hub_fmt, per_byte_ms=1.5, overhead_ms=10):
+    """
+    fps:            Pixy frame‐rate in frames per second (e.g. 25)
+    from_hub_fmt:   struct format string for the outbound payload (e.g. '2H')
+    per_byte_ms:    empirical cost to send one byte over I²C (default 1.5 ms/byte)
+    overhead_ms:    extra margin for I²C retries + processing (default 10 ms)
+
+    Returns total wait time in ms, rounded *up* to the nearest multiple of 5.
+    """
+    # 1) How long between fresh frames:
+    frame_period_ms = 1000.0 / fps               # e.g. 25 fps → 40.0 ms
+
+    # 2) How long to send the outbound payload:
+    payload_bytes   = calcsize(from_hub_fmt)  # e.g. '2H' → 4 bytes
+    payload_time_ms = payload_bytes * per_byte_ms    # e.g. 4 * 1.5 ms = 6.0 ms
+
+    # 3) Sum with overhead:
+    total_ms = frame_period_ms + payload_time_ms + overhead_ms  # e.g. 40 + 6 + 10 = 56 ms
+
+    # 4) Round *up* to the next 5 ms:
+    return int(ceil(total_ms / 5.0) * 5)
+
+WAIT_CL = compute_wait_ms(fps=15, from_hub_fmt='2H')
+def ReadCubes(coords:tuple):
+    for x, y in coords:
+        closest_sig = pr.call('camCl', x, y, wait_ms=WAIT_CL)
+        # print(f"Closest block to ({x:3}, {y:3}): sig={closest_sig}")
+    return closest_sig
