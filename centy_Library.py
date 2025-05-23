@@ -82,8 +82,8 @@ kdLF = const(4.5)
 kiLF = const(0)
 
 #K-uri pentru LineFollower cu Senzorii 3 si 5
-kpLFSA = const(0.17)
-kdLFSA = const(1.2)
+kpLFSA = const(0.3)
+kdLFSA = const(1.4)
 kiLFSA = const(0)
 
 #K-uri pentru Encoder RobotSpin
@@ -614,8 +614,75 @@ def LFEncoderSA(speed: int, mm: float, sensor1: int, sensor2: int, color: str, a
         LeftMotor.hold()
         RightMotor.hold()
     #endif
-
 #end LFEncoderSA
+
+def LFIntersectionSA(speed: int, sensor1: int, sensor2: int, blackV:int, intersections: int, color: str, accel: bool, aliniere: bool, brake: bool):
+
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
+
+    V = ErrorOld = ErrorSum = Error = CurEncoder = flag = 0
+    
+    if (speed < 0):
+        sens = -1
+    else:
+        sens = 1
+    #endif
+
+    speed = abs(speed)
+    pr.call('lfacl', color)
+
+    while(flag < intersections):
+        s1, s2 = pr.call('lftwo', sensor1, sensor2)
+        Error = (s1 - s2)
+        print(s1,s2)
+
+        LeftEncoder = LeftMotor.angle()
+        RightEncoder = RightMotor.angle()
+        CurEncoder = (LeftEncoder + RightEncoder) / 2
+
+        P = kpLFSA * Error
+        I = kiLFSA * ErrorSum
+        D = kdLFSA * (Error - ErrorOld)
+
+        ErrorOld = Error
+        ErrorSum = ErrorSum + Error
+
+        if accel == True:
+            if CurEncoder <= AccelerationEncoder:
+                V = abs((CurEncoder / AccelerationEncoder) * (speed - V0 * sens) + V0 * sens)
+                V = min(max(V, V0rot), speed)
+            #endif
+        else:
+            V = speed
+        #endif
+
+        V = V * sens
+
+        LeftMotor.dc(V + (P + I + D))
+        RightMotor.dc(V - (P + I + D))
+
+        if(blackV < 30):
+            if(s1 <= blackV or s2 <= blackV):
+                flag+=1
+        else:
+            if(s1 >= blackV or s2 >= blackV):
+                flag +=1
+        #endif
+
+    #endwhile
+    
+    if(aliniere == True):
+        Navigation.settings(straight_speed = speed * LaSuta)
+        Navigation.settings(straight_acceleration = speed * LaSuta)
+        Navigation.straight(wheelSensorDistance)
+    #endif
+
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #endif
+#end LFIntersectionSA
 
 def LF2SIntersectionBlack(speed: int, intersections: int, accel: bool, aliniere: bool, brake: bool):
     LeftMotor.reset_angle(0)
@@ -1726,10 +1793,11 @@ def Cazuri(caz: str,mistake:float, imux: float):
         MoveSyncGyro(80,3.5*cm,1,1,1)
         wait(50)
         RobotCompas(70, 87, STANGA, 0, 1, 1, 0)
-        wait(2000)
-        LFEncoderSA(60,13*cm,3,5,"red",1,0,0)
-        MoveSyncGyro(60,7.5*cm,0,1,1)
-        wait(50)
+        wait(100)
+        LFEncoderSA(60,10*cm,3,5,"red",1,0,0)
+        LFIntersectionSA(60,3,5,55,1,"red",0,0,0)
+        MoveSyncGyro(60,4*cm,0,1,1)
+        wait(100)
         run_task(clawGoTo(CLOSED,1,0,500))
         MoveSyncGyro(-70,9*cm,1,1,1)
         wait(50)
@@ -1800,9 +1868,10 @@ def Cazuri(caz: str,mistake:float, imux: float):
         wait(50)
         RobotCompas(70, 87, STANGA, 0, 1, 1, 0)
         wait(100)
-        LFEncoderSA(60,13*cm,3,5,"red",1,0,0)
-        MoveSyncGyro(60,7.5*cm,0,1,1)
-        wait(50)
+        LFEncoderSA(60,10*cm,3,5,"red",1,0,0)
+        LFIntersectionSA(60,3,5,55,1,"red",0,0,0)
+        MoveSyncGyro(60,4*cm,0,1,1)
+        wait(100)
         run_task(clawGoTo(CLOSED,1,0,500))
         wait(10)
         SMove(-90,90,DREAPTA,0,1,1,15)

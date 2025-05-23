@@ -9,7 +9,7 @@ from pybricks.tools import wait, StopWatch, multitask, run_task
 from micropython import const
 from umath import ceil
 
-LeftMotor = Motor(Port.B, Direction.COUNTERCLOCKWISE)
+LeftMotor = Motor(Port.A, Direction.COUNTERCLOCKWISE)
 RightMotor = Motor(Port.C)
 
 while 1==1:
