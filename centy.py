@@ -3,7 +3,6 @@ from centy_Library import *
 print(f"battery voltage : {Brick.battery.voltage()}")
 timer = StopWatch()
 Init()
-print(Brick.imu.rotation(TopAxis))
 
 cpatrat = 0
 switchleftright1,switchleftright2,switchinsideoutside,caz = GetSwitchesAndCase(1,2,4,3)
@@ -27,7 +26,7 @@ run_task(liftGoTo(10,1.8,0,400))
 # gata steag alb
 
 wait(100)
-run_task(liftGoTo(50,2,0,500))
+run_task(liftGoTo(40,2,0,500))
 wait(100)
 mistake = imux - Brick.imu.rotation(TopAxis)
 RobotSpin(80,90 + mistake,DREAPTA,1,0,1,1)
@@ -43,7 +42,7 @@ print("cazul patratului",cpatrat)
 # gata citire caz patrat
 
 wait(100)
-RobotSpin(80,abs(imux - Brick.imu.rotation(TopAxis)),(imux - Brick.imu.rotation(TopAxis))/abs(imux - Brick.imu.rotation(TopAxis)),1,0,1,1)
+RobotSpin(80,abs(imux - Brick.imu.rotation(TopAxis))+5,(imux - Brick.imu.rotation(TopAxis))/abs(imux - Brick.imu.rotation(TopAxis)),1,0,1,1)
 wait(100) 
 
 # steag rosu
@@ -65,7 +64,7 @@ wait(100)
 RobotSpin(80,90,DREAPTA,1,0,1,1)
 wait(100)
 MoveSyncGyro(-80,20*cm,1,0,0)
-MoveTime(-70,0.6,0,1)
+MoveTime(-70,0.3,0,1)
 run_task(liftGoTo(-2,1,0,550))
 run_task(clawGoTo(0,1,0,550))
 
@@ -75,20 +74,25 @@ wait(100)
 mistake = imux - Brick.imu.rotation(TopAxis) + 180
 RobotSpin(80,90,STANGA,1,0,1,1)
 MoveSyncGyro(-70,3.5*cm,1,0,0)
-MoveTime(-65,0.8,0,1)
+MoveTime(-65,0.6,0,1)
 wait(100)
 MoveSyncGyro(60,3*cm,1,0,0)
 SquaringBlackSA(60,40,4,"red",15*cm,0,0,1)
-wait(200)
+print(timer.time()/1000)
 cub1 = ReadCubes([(50,200)])
-cub2 = ReadCubes([(250,180)])
+cub2 = ReadCubes([(250,170)])
 cub3 = ReadCubes([(100,100)])
 cub4 = ReadCubes([(200,100)])
+
+for i in range(1,4):
+    if(cub1 != i and cub2 != i and cub3 != i):
+        cub4 = i
+    
 print(cub1,cub2,cub3,cub4)
 switchleftright1,switchleftright2,switchinsideoutside,caz = GetSwitchesAndCase(cub1,cub2,cub3,cub4)
 RobotSpin(80,90,DREAPTA,1,0,1,1)
 wait(100)
-MoveTime(-70,0.8,1,1)
+MoveTime(-70,0.7,1,1)
 # gata citire bolti
 
 # patrat
@@ -98,7 +102,8 @@ if cpatrat == 1:
     ArcMove(90,54*cm,90,DREAPTA,0,1,1)
     wait(100)
     mistake = imux - Brick.imu.rotation(TopAxis) + 270
-    RobotSpin(80,mistake + 90,DREAPTA,1,0,1,1)
+    RobotSpin(80,90,DREAPTA,1,0,1,1)
+    RobotSpin(60,abs(mistake),abs(mistake)/mistake*DREAPTA,1,0,0,1)
     MoveSyncGyro(80,8*cm,1,0,0)
     RobotCompas(80,28,DREAPTA,0,1,1,10)
     wait(100)
@@ -109,7 +114,7 @@ if cpatrat == 1:
     MoveSyncGyro(75,10*cm,0,1,1)
     wait(100)
     mistake = imux - Brick.imu.rotation(TopAxis) + 360
-    RobotSpin(60,65-mistake,DREAPTA,0,0,0,1)
+    RobotCompas(-80,60,STANGA,0,1,1,20)
     RobotSpinBlack(60,DREAPTA,30,1,25)
 elif cpatrat == 2:
     # rosu
@@ -130,14 +135,15 @@ elif cpatrat == 3:
     ArcMove(90,48*cm,90,DREAPTA,0,1,1)
     wait(100)
     mistake = imux - Brick.imu.rotation(TopAxis) + 270
-    RobotSpin(80,mistake + 90,DREAPTA,1,0,1,1)
+    RobotSpin(80,90,DREAPTA,1,0,1,1)
+    RobotSpin(60,abs(mistake),abs(mistake)/mistake*DREAPTA,1,0,0,1)
     MSGandCLOSE(85,23*cm,1,0,0,20)
     wait(100)
     SquaringBlackSA(85,25,4,"red",35*cm,0,0,0)
-    MoveSyncGyro(75,15*cm,0,1,1)
+    MoveSyncGyro(75,18*cm,0,1,1)
     wait(100)
     mistake = imux - Brick.imu.rotation(TopAxis) + 360
-    RobotSpin(60,65-mistake,DREAPTA,0,0,0,1)
+    RobotCompas(-80,60,STANGA,0,1,1,20)
     RobotSpinBlack(60,DREAPTA,35,1,25)
 else:
     # galben
@@ -159,13 +165,19 @@ else:
 #endif
 
 run_task(clawGoTo(0,1,0,400))
+kpLFSA = 1.6
+kdLFSA = 2.4
+LFEncoderSA(50,6*cm,3,5,"red",1,1,1)
 wait(100)
-MoveSyncGyro(60,1*cm,1,1,1)
 run_task(clawGoTo(CLOSED,1,0,400))
-wait(100)
-kpLFSA = 1.5
-MoveSyncGyro(-70,17*cm,1,1,1)
-LFEncoderSA(60,20*cm,3,5,"red",1,1,1)
+wait(50)
+MoveSyncGyro(-80,22*cm,1,0,0)
+MoveTime(-80,0.6,0,1)
+wait(50)
+LFEncoderSA(65,26*cm,3,5,"red",1,1,1)
+wait(50)
+kdLFSA = 1.65
+kpLFSA = 0.5
 SMove(90,48,DREAPTA,0,1,1,20)
 wait(100)
 MoveSyncGyro(70,20*cm,1,0,0)
@@ -186,18 +198,14 @@ MoveTime(-75,0.7,0,1)
 wait(100)
 print("acum cazuri", timer.time()/1000)
 # luare bolti
-imux = imux - 360
+imux = imux + 360
 mistake = imux - Brick.imu.rotation(TopAxis)
 print(imux, Brick.imu.rotation(TopAxis))
 Cazuri(caz,mistake,imux)
 # gata luare bolti
 
 wait(100)
-run_task(clawGoTo(OPEN-100,1,0,450))
-wait(100)
-MSGandCLOSE(80,30*cm,1,1,1,15)
-wait(100)
-run_task(clawGoTo(CLOSED,1,0,400))
+MoveSyncGyro(80,28*cm,1,1,1)
 wait(100)
 
 # switch-uri
@@ -257,12 +265,13 @@ print("gata bolti 1 si 2 in", timer.time()/1000, "secunde")
 
 # gard galben
 MoveSyncGyro(80,60*cm,1,0,0)
-SquaringWhiteSA(70,55,4,"red",0,0,0)
+SquaringWhiteSA(80,55,4,"red",0,0,0)
 MoveSyncGyro(70,4*cm,0,1,1)
 wait(100)
 MoveSyncGyro(-70,4*cm,1,1,1)
 wait(100)
 RobotSpin(80,90,DREAPTA,1,0,1,1)
+imux = Brick.imu.rotation(TopAxis)
 wait(100)
 run_task(clawGoTo(CLOSED,1,0,500))
 wait(100)
@@ -270,8 +279,10 @@ MoveSyncGyro(-70,53*cm,1,1,1)
 wait(100)
 CompasTime(70,1,DREAPTA,1)
 wait(50)
-RobotCompas(-70,imux - Brick.imu.rotation(TopAxis),DREAPTA, 0, 1, 1, 20)
-wait(5000)
+print(imux,Brick.imu.rotation(TopAxis))
+RobotCompas(-70,abs(imux - Brick.imu.rotation(TopAxis)),DREAPTA, 0, 1, 1, 20)
+imux = imux - 90
+wait(50)
 print("gata gard galben in", timer.time()/1000, "secunde")
 # gata gard galben
 
@@ -332,7 +343,7 @@ MoveSyncGyro(70,7*cm,1,0,0)
 SquaringWhiteSA(70,50,4,"red",0,0,0)
 MoveSyncGyro(70,10*cm,0,0,1)
 wait(100)
-run_task(liftGoTo(30,1,1,500))
+run_task(liftGoTo(25,1,1,500))
 RobotSpin(70,90,DREAPTA,1,0,1,1)
 wait(100)
 MoveTime(70,0.5,1,1)
@@ -353,24 +364,25 @@ run_task(liftGoTo(DOWN,1,0,450))
 wait(100)
 MoveSyncGyro(70,15*cm,1,1,1)
 wait(100)
-RobotSpin(70,90,DREAPTA,1,0,1,1)
+RobotSpin(70,70,DREAPTA,1,0,1,1)
+RobotSpinBlack(70,DREAPTA,35,1)
 wait(100)
 LFEncoderSA(50,6*cm,3,5,"red",1,0,0)
 LFIntersectionSA(70,3,5,35,2,"red",0,0,0)
 MoveSyncGyro(70,2*cm,0,0,0)
 LFEncoderSA(70,8*cm,3,5,"red",0,1,1)
 wait(100)
-run_task(liftGoTo(UP,1,1,500))
+run_task(liftGoTo(UP,1.3,1,500))
 wait(100)
-MoveSyncGyro(60,17*cm,1,1,1)
+MoveSyncGyro(60,17.2*cm,1,1,1)
 run_task(clawGoTo(-30,1,0,500))
-run_task(liftGoTo(DOWN,1,0,500))
+run_task(liftGoTo(DOWN,1.5,0,500))
 wait(100)
 # gata luare nas rosu
 
 # luare nas galben
 MoveSyncGyro(40,5*cm,1,0,0)
-MSGandCLOSE(40,5*cm,0,0,1,30)
+MSGandCLOSE(40,8*cm,0,0,1,30)
 wait(100)
 # gata luare nas galben
 
@@ -385,7 +397,7 @@ MoveSyncGyro(80,23*cm,1,1,1)
 wait(100)
 RobotCompas(70,45,STANGA,0,0,1,0)
 wait(100)
-MoveSyncGyro(70,12*cm,1,1,1)
+MoveSyncGyro(70,10*cm,1,1,1)
 wait(100)
 run_task(clawGoTo(OPEN,1,0,550))
 wait(100)

@@ -55,7 +55,7 @@ V0 = const(45)
 Vmax = const(93)
 V0rot = const(35)
 V0comp = const(40)
-V0arc = const(55)
+V0arc = const(60)
 
 #Acceleratie si deceleratie mers fata spate
 AccelerationEncoder = const(250)
@@ -69,8 +69,12 @@ DecelerationEncoderRot = const(70)
 AccelerationEncoderComp = const(10)
 DecelerationEncoderComp = const(40)
 
+#Acceleratie si deceleratie compas
+AccelerationEncoderCompM = const(20)
+DecelerationEncoderCompM = const(30)
+
 AccelerationEncoderArc = const(30)
-DecelerationEncoderArc = const(60)
+DecelerationEncoderArc = const(30)
 
 #Valori culori
 white = const(90)
@@ -82,7 +86,7 @@ kdLF = const(4.5)
 kiLF = const(0)
 
 #K-uri pentru LineFollower cu Senzorii 3 si 5
-kpLFSA = (0.45)
+kpLFSA = (0.5)
 kdLFSA = (1.65)
 kiLFSA = (0)
 
@@ -184,12 +188,24 @@ def deg2mm(degree: int) -> int:
 #end deg2mm
 
 def Init():
-    Brick.imu.reset_heading(0)
-    wait(300)
     LiftMotor.reset_angle(0)
     ClawMotor.reset_angle(0)
 
 #end init
+
+def CheckSOL():
+    s1,s2,s3,s4,s5,s6,s7 = pr.call("lfall",1,2,3,4,5,6,7)
+    if(s3 <= 35 and s5 > 35): 
+        return DREAPTA
+    elif(s3 > 35 and s5 <= 35):
+        return STANGA
+
+    if(s2 <= 35 and s6 > 35): 
+        return DREAPTA
+    elif(s2 > 35 and s6 <= 35): 
+        return STANGA
+
+#end CheckSOL
 
 async def liftGoTo(degrees: float, kp: float, kd: float, time: int):
     timerLift = StopWatch()
@@ -609,8 +625,8 @@ def LFEncoderSA(speed: int, mm: float, sensor1: int, sensor2: int, color: str, a
     #endwhile
     
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 #end LFEncoderSA
 
@@ -677,8 +693,8 @@ def LFIntersectionSA(speed: int, sensor1: int, sensor2: int, blackV:int, interse
     #endif
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 #end LFIntersectionSA
 
@@ -738,8 +754,8 @@ def LF2SIntersectionBlack(speed: int, intersections: int, accel: bool, aliniere:
     #endif
         
     if(brake == True):
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end LF2SIntersection
@@ -808,13 +824,26 @@ def MoveSync(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     #endwhile
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end MoveSync
 
-def RobotSpin(speed: int, grade:float, direction: int, pid:bool, accel: bool, decel: bool, brake: bool, turbo = 0):
+def RobotSpin(speed, grade, direction, pid = 1, accel = 1, decel = 1, brake = 1, turbo = 0):
+    """
+    Execută o rotație a robotului.
+
+    Parametri:
+    - speed: Viteza de rotație.
+    - grade: Unghiul în grade.
+    - direction: STANGA sau DREAPTA.
+    - pid: 1 = PID activat, 0 = dezactivat.
+    - accel: 1 = accelerație activă, 0 = dezactivată.
+    - decel: 1 = decelerație activă, 0 = dezactivată.
+    - brake: 1 = frână activă, 0 = dezactivată.
+    - turbo: turbo peste V0, 0 = dezactivat.
+    """
     imux = Brick.imu.rotation(TopAxis)
     FirstAngle = CurAngle = imux
     FinalAngle = imux + grade * direction
@@ -879,11 +908,11 @@ def RobotSpin(speed: int, grade:float, direction: int, pid:bool, accel: bool, de
     error = errorSum = errorOld = 0
     exitCondition = 1
 
+    vit = V0rot
+
     while exitCondition == 1 and pid == True:
         CurAngle = Brick.imu.rotation(TopAxis)
         error = FinalAngle - CurAngle
-
-        vit = V0rot + 5
 
         if(error < 0):
             vit = V0rot + turbo
@@ -911,8 +940,8 @@ def RobotSpin(speed: int, grade:float, direction: int, pid:bool, accel: bool, de
     timerPID.pause()
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
     
 #end RobotSpin
@@ -1016,8 +1045,8 @@ def goToHeading(speed: int, grade:float, accel: bool, decel: bool, brake: bool):
     timerPID.pause()
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
     
 #end RobotSpin
@@ -1080,6 +1109,7 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
         #endif
         
         V = V * sens
+        print(CurAngle,FinalAngle)
 
         if direction == 1:
             RightMotor.hold()
@@ -1145,6 +1175,80 @@ def CompasTime(speed: int, time: float, direction:int, brake: bool):
 #end RobotCompas
 
 
+def CompasCareMerge(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool, turbo: int):
+    encoder = ((wheelDistance * 3.14) * grade ) / 360
+    FinalEncoder = mm2deg(encoder)
+
+    LeftMotor.reset_angle(0)
+    RightMotor.reset_angle(0)
+
+    speedsemn = speed / abs(speed)
+
+    imux = Brick.imu.rotation(TopAxis)
+    FinalAngle = imux + grade * direction * speedsemn
+    FirstAngle = CurAngle = imux
+
+    V = CurEncoder = Enc = 0
+    
+    if speed > 0:
+        sens = 1
+    else:
+        sens = -1
+    #
+
+    speed = abs(speed)
+
+    flag = 1
+
+    CurAngle = AngleEncoder = Brick.imu.rotation(TopAxis)
+    delta = 0
+    
+    while(flag == 1):
+        delta = abs(CurAngle - Brick.imu.rotation(TopAxis)) 
+        CurAngle = Brick.imu.rotation(TopAxis)
+        AngleEncoder = CurAngle - FirstAngle
+
+        if accel == True:
+            if abs(AngleEncoder) <= AccelerationEncoderCompM:
+                V = abs((abs(AngleEncoder) / AccelerationEncoderCompM) * (speed - V0comp - turbo) + V0comp+ turbo)
+                V = min(max(V, V0comp), speed)
+            #
+        else:
+            V = speed
+        #
+
+        if decel == True:
+            if grade - abs(AngleEncoder) <= DecelerationEncoderCompM :
+                V = abs(( (grade - abs(AngleEncoder) ) / DecelerationEncoderCompM ) * ( abs(speed) - V0comp - turbo ) + V0comp + turbo)
+                V = min(max(V, V0comp), speed)
+            #
+        #
+        
+        V = V * sens
+        print([CurAngle,FinalAngle,AngleEncoder,V,delta])
+
+        if direction == 1:
+            RightMotor.hold()
+            LeftMotor.dc(V)
+        else:
+            LeftMotor.hold()
+            RightMotor.dc(V)
+        #
+        
+        if (direction == 1 and speed*sens > 0) or (direction == -1 and speed*sens < 0):
+            if(CurAngle + delta >= FinalAngle):
+                flag=0
+        else:
+            if(CurAngle - delta <= FinalAngle):
+                flag=0
+        #
+    #
+    
+    if brake == True:
+        LeftMotor.hold()
+        RightMotor.hold()
+    #
+#
 
 def SMove(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool, turbo: int):
     RobotCompas(speed, grade, direction, accel, decel, brake, turbo)
@@ -1231,8 +1335,8 @@ def MoveTime(speed: int, time: float, accel: bool, brake: bool):
     #endWhile
 
     if(brake == True):
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end MoveTime
@@ -1304,10 +1408,6 @@ def RobotSpinBlack(speed: int, direction: int, grey: int, endBrake: bool, turbo 
     if endBrake == True:
         LeftMotor.brake()
         RightMotor.brake()
-
-        LeftMotor.hold()
-        RightMotor.hold()
-        Navigation.straight(0,Stop.HOLD)
     #endif
 #end RobotSpinBlack
 
@@ -1368,8 +1468,8 @@ def SquaringWhite(speed: int, white: int, accel: bool, aliniere: bool, brake: bo
     #endIf
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end SquaringWhite
@@ -1436,8 +1536,8 @@ def SquaringWhiteSA(speed: int, whiteV: int, sensor: int, color: str, accel: boo
     #endIf
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end SquaringWhiteSA
@@ -1501,8 +1601,8 @@ def SquaringBlack(speed: int, black: int, maxcm:float, accel: bool, aliniere: bo
     #endIf
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end SquaringBlack
@@ -1568,8 +1668,8 @@ def SquaringBlackSA(speed: int, blackV: int, sensor:int, color: str, maxcm:float
     #endIf
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 #end SquaringBlackS4
@@ -1637,8 +1737,8 @@ def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
     #endwhile
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, clawspeed:int):
@@ -1709,8 +1809,8 @@ def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, cl
     ClawMotor.hold()
 
     if brake == True:
-        LeftMotor.hold()
-        RightMotor.hold()
+        LeftMotor.brake()
+        RightMotor.brake()
     #endif
 
 def GetSwitchesAndCase(cub1:int,cub2:int,cub3:int,cub4:int):
@@ -1728,7 +1828,7 @@ def GetSwitchesAndCase(cub1:int,cub2:int,cub3:int,cub4:int):
             switchinsideoutside = True
     if ((cub1 == 3 and cub2 == 2) or (cub1 == 2 and cub2 == 3)) or ((cub1 == 4 and cub2 == 1) or (cub1 == 1 and cub2 == 4)):
         caz = "diagonal"
-        if (cub1 == 3 and cub2 == 2) or (cub1 == 1 and cub2 == 4):
+        if (cub1 == 3 and cub2 == 2) or (cub1 == 4 and cub2 == 1):
             switchleftright1 = True
         if (cub3 == 1 and cub4 == 4) or (cub3 == 2 and cub4 == 3):
             switchleftright2 = True
@@ -1770,22 +1870,23 @@ def SwitchLefttoRight():
 
 def SwitchInsidetoOutside():
     #NOTE: ASIGURA-TE CA AI MACAR 25 CM IN SPATE SI GHEARA INCHISA
+    run_task(clawGoTo(CLOSED,1,0,450))
     run_task(liftGoTo(UP,1,0,550))
     wait(100)
     MoveSyncGyro(-70,28*cm,1,1,1)
     run_task(multitask(
-        liftGoTo(DOWN,1,0,500),
+        liftGoTo(DOWN,1.5,0,500),
         clawGoTo(OPEN,1,0,500),
         liftGoTo(UP,1.2,0,500)
     ))
     wait(100)
     MoveSyncGyro(70,13*cm,1,1,1)
-    run_task(liftGoTo(DOWN,1,0,500))
+    run_task(liftGoTo(DOWN,1.5,0,500))
     MoveSyncGyro(70,11*cm,1,1,1)
     run_task(clawGoTo(CLOSED,1,0,500))
 #end SwitchInsidetoOutside
 
-def Cazuri(caz: str,mistake:float, imux: float):
+# def Cazuri(caz: str,mistake:float, imux: float):
     if caz == "drept":
         MoveSyncGyro(80,3*cm,1,1,1)
         wait(100)
@@ -1808,7 +1909,7 @@ def Cazuri(caz: str,mistake:float, imux: float):
         wait(100)
         run_task(
             multitask(
-                liftGoTo(DOWN,0.7,0,500),
+                liftGoTo(DOWN,1.5,0,500),
             )
         )
         wait(100)
@@ -1836,7 +1937,7 @@ def Cazuri(caz: str,mistake:float, imux: float):
         wait(100)
         MoveSyncGyro(-50,3*cm,1,0,0)
         MoveTime(-40,0.5,0,1)
-        run_task(liftGoTo(DOWN,0.7,0,500))
+        run_task(liftGoTo(DOWN,1.5,0,500))
         MoveSyncGyro(60,6*cm,1,1,1)
         run_task(clawGoTo(CLOSED,1,0,500))
         wait(100)
@@ -1846,7 +1947,7 @@ def Cazuri(caz: str,mistake:float, imux: float):
         run_task(liftGoTo(UP,1,0,550))
         wait(100)
         MoveSyncGyro(60,10*cm,1,1,1)
-        run_task(liftGoTo(DOWN,0.7,0,500))
+        run_task(liftGoTo(DOWN,1.5,0,500))
         wait(100)
         MoveSyncGyro(60,5*cm,1,1,1)
         run_task(clawGoTo(CLOSED,1,0,500))
@@ -1864,14 +1965,12 @@ def Cazuri(caz: str,mistake:float, imux: float):
         wait(100)
         RobotCompas(70, 87, STANGA, 0, 1, 1, 5)
         wait(100)
-        LFEncoderSA(50,8*cm,6,2,"blue",1,0,0)
+        LFEncoderSA(50,8*cm,3,5,"red",1,0,0)
         SquaringWhiteSA(50,30,4,"blue",0,0,1)
         wait(100)
         run_task(clawGoTo(CLOSED,1,0,500))
         wait(100)
         SMove(-90,90,DREAPTA,0,1,1,15)
-        wait(100)
-        RobotSpin(60,abs(imux - Brick.imu.rotation(TopAxis)),(imux - Brick.imu.rotation(TopAxis))/abs(imux - Brick.imu.rotation(TopAxis)),1,0,0,1)
         wait(100)
         MSGandCLOSE(70,21*cm,1,1,1,-20)
         wait(100)
@@ -1880,8 +1979,6 @@ def Cazuri(caz: str,mistake:float, imux: float):
         MoveSyncGyro(-80,20*cm,1,1,1)
         wait(100)
         SMove(85,52,STANGA,0,1,1,10)
-        wait(100)
-        RobotSpin(70,abs(imux - Brick.imu.rotation(TopAxis)),(imux - Brick.imu.rotation(TopAxis))/abs(imux - Brick.imu.rotation(TopAxis)),1,0,0,1)
         wait(100)
         MoveSyncGyro(75,11*cm,1,1,1)
         run_task(clawGoTo(CLOSED,1,0,500))
@@ -1898,7 +1995,7 @@ def Cazuri(caz: str,mistake:float, imux: float):
         MoveSyncGyro(80,11*cm,1,1,1)
         wait(100)
         run_task(
-                liftGoTo(DOWN,1.2,0,500)
+                liftGoTo(DOWN,1.5,0,500)
         )
         wait(100)
         RobotSpin(70,15,DREAPTA,1,0,0,1)
@@ -1956,3 +2053,6 @@ def ReadCubes(coords:tuple):
         closest_sig = pr.call('camCl', x, y, wait_ms=WAIT_CL)
         # print(f"Closest block to ({x:3}, {y:3}): sig={closest_sig}")
     return closest_sig
+
+
+print(f"NU MAI COMPILA FUNCTIILE")
