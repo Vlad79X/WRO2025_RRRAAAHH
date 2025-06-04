@@ -53,7 +53,7 @@ wheelSensorDistance = const(11) * cm
 #Valoarea maxima si minima de viteza
 V0 = const(45)
 Vmax = const(93)
-V0rot = const(35)
+V0rot = const(38)
 V0comp = const(40)
 V0arc = const(60)
 
@@ -86,9 +86,9 @@ kdLF = const(4.5)
 kiLF = const(0)
 
 #K-uri pentru LineFollower cu Senzorii 3 si 5
-kpLFSA = (0.5)
-kdLFSA = (1.65)
-kiLFSA = (0)
+kpLFSA = 0.5
+kdLFSA = 1.65
+kiLFSA = 0
 
 #K-uri pentru Encoder RobotSpin
 kpSP = const(0.5)
@@ -141,7 +141,7 @@ MID = const(25)
 DOWN = const(0)
 
 #maximum timer for rotation gyro correction
-rotationTimer = const(279)
+rotationTimer = const(379)
 
 #---Declarations----------------------------------------------------------------
 
@@ -567,7 +567,7 @@ def LFEncoder(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
 
 #end LFEncoder
 
-def LFEncoderSA(speed: int, mm: float, sensor1: int, sensor2: int, color: str, accel: bool, decel: bool, brake: bool):
+def LFEncoderSA(speed: int, mm: float, kp: float, kd: float, sensor1: int, sensor2: int, color: str, accel: bool, decel: bool, brake: bool):
     FinalEncoder = mm2deg(mm)
 
     LeftMotor.reset_angle(0)
@@ -594,9 +594,9 @@ def LFEncoderSA(speed: int, mm: float, sensor1: int, sensor2: int, color: str, a
         RightEncoder = RightMotor.angle()
         CurEncoder = (LeftEncoder + RightEncoder) / 2
 
-        P = kpLFSA * Error
+        P = kp * Error
         I = kiLFSA * ErrorSum
-        D = kdLFSA * (Error - ErrorOld)
+        D = kd * (Error - ErrorOld)
 
         ErrorOld = Error
         ErrorSum = ErrorSum + Error
@@ -649,7 +649,7 @@ def LFIntersectionSA(speed: int, sensor1: int, sensor2: int, blackV:int, interse
     while(flag < intersections):
         s1, s2 = pr.call('lftwo', sensor1, sensor2)
         Error = (s1 - s2)
-        print(s1,s2)
+        #print(s1,s2)
 
         LeftEncoder = LeftMotor.angle()
         RightEncoder = RightMotor.angle()
@@ -830,7 +830,7 @@ def MoveSync(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
 
 #end MoveSync
 
-def RobotSpin(speed, grade, direction, pid = 1, accel = 1, decel = 1, brake = 1, turbo = 0):
+def RobotSpin(speed, grade, direction, pid = 1, accel = 0, decel = 1, brake = 1, turbo = 0):
     """
     Execută o rotație a robotului.
 
@@ -906,18 +906,18 @@ def RobotSpin(speed, grade, direction, pid = 1, accel = 1, decel = 1, brake = 1,
     timerPID = StopWatch()
     time = rotationTimer
     error = errorSum = errorOld = 0
-    exitCondition = 1
+    exitCondition = pid
 
     vit = V0rot
 
-    while exitCondition == 1 and pid == True:
+    while exitCondition == 1:
         CurAngle = Brick.imu.rotation(TopAxis)
         error = FinalAngle - CurAngle
 
         if(error < 0):
-            vit = V0rot + turbo
+            vit = V0rot
         else:
-            vit = -V0rot - turbo
+            vit = -V0rot
         #endif
 
         speedL = -vit
@@ -931,7 +931,7 @@ def RobotSpin(speed, grade, direction, pid = 1, accel = 1, decel = 1, brake = 1,
             RightMotor.dc(speedR)
         #endif
 
-        if timerPID.time() > time or (abs(error) < 0.07 and timerPID.time() > 79):
+        if timerPID.time() > time or (abs(error) < 0.08 and timerPID.time() > 150):
             exitCondition = 0
         #endif
 
@@ -1109,7 +1109,7 @@ def RobotCompas(speed: int, grade: float, direction: int, accel: bool, decel: bo
         #endif
         
         V = V * sens
-        print(CurAngle,FinalAngle)
+        #print(CurAngle,FinalAngle)
 
         if direction == 1:
             RightMotor.hold()
@@ -1225,7 +1225,7 @@ def CompasCareMerge(speed: int, grade: float, direction: int, accel: bool, decel
         #
         
         V = V * sens
-        print([CurAngle,FinalAngle,AngleEncoder,V,delta])
+        #print([CurAngle,FinalAngle,AngleEncoder,V,delta])
 
         if direction == 1:
             RightMotor.hold()
@@ -1252,9 +1252,9 @@ def CompasCareMerge(speed: int, grade: float, direction: int, accel: bool, decel
 
 def SMove(speed: int, grade: float, direction: int, accel: bool, decel: bool, brake: bool, turbo: int):
     RobotCompas(speed, grade, direction, accel, decel, brake, turbo)
-    wait(100)
+    wait(200)
     RobotCompas(speed, grade, 0 - direction, accel, decel, brake, turbo)
-    wait(100)
+    wait(200)
 
 # ┌ 𝙙𝙚 𝙛𝙪𝙣𝙘𝙩𝙞𝙖 𝙖𝙨𝙩𝙖 𝙣𝙪 𝙢𝙖 𝙖𝙩𝙞𝙣𝙜 ┐ -𝓿𝓵𝓪𝓭
 def RobotSpinWhite(speed: int, direction: int, endBrake: bool):
@@ -1489,10 +1489,10 @@ def SquaringWhiteSA(speed: int, whiteV: int, sensor: int, color: str, accel: boo
     pr.call('lfacl', color)
 
     s = pr.call('lfone', sensor)
-    print(s)
+    #print(s)
     while(s < whiteV):
         s = pr.call('lfone', sensor)
-        print(s)
+        #print(s)
         LeftEncoder = LeftMotor.angle()
         RightEncoder = RightMotor.angle()
         CurEncoder = (LeftEncoder + RightEncoder) / 2
@@ -1741,7 +1741,7 @@ def MoveSyncGyro(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
         RightMotor.brake()
     #endif
 
-def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, clawspeed:int):
+def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, clawspeed = 0, liftspeed = 0):
     FinalEncoder = mm2deg(mm)
 
     LeftMotor.reset_angle(0)
@@ -1750,7 +1750,7 @@ def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, cl
     IniAngle = Brick.imu.rotation(TopAxis)
 
     V = ErrorEncoder = ErrorEncoderSum = ErrorEncoderOld = ErrorAngle = ErrorAngleSum = ErrorAngleOld = CurEncoder = 0
-    clawCondition = 1
+    clawCondition = liftCondition = 1
     if speed < 0:
         sens = -1
     else:
@@ -1800,12 +1800,17 @@ def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, cl
 
         LeftMotor.dc((V + (Pe + Ie + De + Pa + Ia + Da)) * sens)
         RightMotor.dc((V - (Pe + Ie + De + Pa + Ia + Da)) * sens)
+        if liftCondition:
+            LiftMotor.run(liftspeed*10)
+        if LiftMotor.stalled():
+            liftCondition = 0
         if clawCondition:
             ClawMotor.run(-clawspeed*10)
-        if ClawMotor.stalled:
+        if ClawMotor.stalled():
             clawCondition = 0
 
     #endwhile
+    LiftMotor.hold()
     ClawMotor.hold()
 
     if brake == True:
@@ -1871,13 +1876,13 @@ def SwitchLefttoRight():
 def SwitchInsidetoOutside():
     #NOTE: ASIGURA-TE CA AI MACAR 25 CM IN SPATE SI GHEARA INCHISA
     run_task(clawGoTo(CLOSED,1,0,450))
-    run_task(liftGoTo(UP,1,0,550))
+    run_task(liftGoTo(UP,3,3,550))
     wait(100)
     MoveSyncGyro(-70,28*cm,1,1,1)
     run_task(multitask(
         liftGoTo(DOWN,1.5,0,500),
         clawGoTo(OPEN,1,0,500),
-        liftGoTo(UP,1.2,0,500)
+        liftGoTo(UP,2,2,500)
     ))
     wait(100)
     MoveSyncGyro(70,13*cm,1,1,1)
@@ -1886,41 +1891,17 @@ def SwitchInsidetoOutside():
     run_task(clawGoTo(CLOSED,1,0,500))
 #end SwitchInsidetoOutside
 
-# def Cazuri(caz: str,mistake:float, imux: float):
+def Cazuri(caz: str,mistake:float, imux: float):
     if caz == "drept":
         MoveSyncGyro(80,3*cm,1,1,1)
         wait(100)
         RobotCompas(70, 88, STANGA, 0, 1, 1, 0)
         wait(100)
-        LFEncoderSA(50,8*cm,3,5,"red",1,0,0)
-        SquaringWhiteSA(50,30,4,"blue",0,0,1)
-        wait(100)
-        run_task(clawGoTo(CLOSED,1,0,500))
-        MoveSyncGyro(-70,9*cm,1,1,1)
-        wait(100)
-        run_task(
-            multitask(
-                clawGoTo(OPEN,1,0,450),
-                liftGoTo(UP,10,5,500)
-            )
-        )
-        wait(100)
-        MoveSyncGyro(50,11*cm,0,1,1)
-        wait(100)
-        run_task(
-            multitask(
-                liftGoTo(DOWN,1.5,0,500),
-            )
-        )
-        wait(100)
-        MoveSyncGyro(50,6.5*cm,0,0,1)
-        wait(100)
-        run_task(clawGoTo(CLOSED,1,0,500))
-        wait(100)
-        MoveSyncGyro(-60,15*cm,0,0,1)
-        wait(100)
-        RobotCompas(-80,88,STANGA,0,1,1,0)
-        wait(100)
+        LFEncoderSA(60,11*cm,0.7,2,3,5,"red",1,0,0)
+        MSGandCLOSE(50,9*cm,0,0,0,0,60)
+        MSGandCLOSE(50,13*cm,0,1,1,45,-60)
+        MoveSyncGyro(-80,15*cm,0,1,1)
+        RobotCompas(-80,88,STANGA,0,0,0,0)
         MoveTime(-70,0.5,0,1)
     elif caz == "lateral":
         MoveSyncGyro(60,27*cm,1,1,1)
@@ -2022,7 +2003,7 @@ def SwitchInsidetoOutside():
         wait(100)
         MoveSyncGyro(-75,5*cm,0,0,1)
         MoveTime(-85,0.3,0,1)
-#endif
+    #endif
 #end Cazuri
     
 def compute_wait_ms(fps, from_hub_fmt, per_byte_ms=1.5, overhead_ms=10):
