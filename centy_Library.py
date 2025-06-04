@@ -51,23 +51,23 @@ wheelDistance = const(14) * cm
 wheelSensorDistance = const(11) * cm
 
 #Valoarea maxima si minima de viteza
-V0 = const(45)
-Vmax = const(93)
-V0rot = const(38)
-V0comp = const(40)
-V0arc = const(60)
+V0 = const(48)
+Vmax = const(94)
+V0rot = const(42)
+V0comp = const(45)
+V0arc = const(62)
 
 #Acceleratie si deceleratie mers fata spate
 AccelerationEncoder = const(250)
-DecelerationEncoder = const(150)
+DecelerationEncoder = const(200)
 
 #Acceleratie si deceleratie rotiri
 AccelerationEncoderRot = const(10)
-DecelerationEncoderRot = const(70)
+DecelerationEncoderRot = const(50)
 
 #Acceleratie si deceleratie compas
 AccelerationEncoderComp = const(10)
-DecelerationEncoderComp = const(40)
+DecelerationEncoderComp = const(50)
 
 #Acceleratie si deceleratie compas
 AccelerationEncoderCompM = const(20)
@@ -830,7 +830,7 @@ def MoveSync(speed: int, mm: float, accel: bool, decel: bool, brake: bool):
 
 #end MoveSync
 
-def RobotSpin(speed, grade, direction, pid = 1, accel = 0, decel = 1, brake = 1, turbo = 0):
+def RobotSpin(speed, grade, direction, pid = 1, accel = 0, decel = 1, brake = 1, turbo = 0, turbopid = 0):
     """
     Execută o rotație a robotului.
 
@@ -915,9 +915,9 @@ def RobotSpin(speed, grade, direction, pid = 1, accel = 0, decel = 1, brake = 1,
         error = FinalAngle - CurAngle
 
         if(error < 0):
-            vit = V0rot
+            vit = V0rot + turbopid
         else:
-            vit = -V0rot
+            vit = -V0rot - turbopid
         #endif
 
         speedL = -vit
@@ -931,7 +931,9 @@ def RobotSpin(speed, grade, direction, pid = 1, accel = 0, decel = 1, brake = 1,
             RightMotor.dc(speedR)
         #endif
 
-        if timerPID.time() > time or (abs(error) < 0.08 and timerPID.time() > 150):
+        if timerPID.time() > time or (abs(error) < 0.05 and timerPID.time() > 150):
+            LeftMotor.hold()
+            RightMotor.hold()
             exitCondition = 0
         #endif
 
@@ -1804,6 +1806,7 @@ def MSGandCLOSE(speed: int, mm: float, accel: bool, decel: bool, brake: bool, cl
             LiftMotor.run(liftspeed*10)
         if LiftMotor.stalled():
             liftCondition = 0
+
         if clawCondition:
             ClawMotor.run(-clawspeed*10)
         if ClawMotor.stalled():
@@ -1852,7 +1855,7 @@ def GetSwitchesAndCase(cub1:int,cub2:int,cub3:int,cub4:int):
 
 def SwitchLefttoRight():
     imux = Brick.imu.rotation(TopAxis)
-    run_task(clawGoTo(OPEN-50,1,0,500))
+    run_task(clawGoTo(OPEN-30,1,0,500))
     MoveSyncGyro(-80,10*cm,1,1,1)
     wait(100)
     RobotCompas(80,15,DREAPTA,0,1,1,10)
@@ -1864,7 +1867,7 @@ def SwitchLefttoRight():
     wait(100)
     RobotCompas(80,30,STANGA,0,1,1,10)
     wait(100)
-    run_task(clawGoTo(OPEN-50,1,0,500))
+    run_task(clawGoTo(OPEN-30,1,0,500))
     MoveSyncGyro(80,11*cm,1,1,1)
     run_task(clawGoTo(CLOSED,1.2,0,500))
     wait(100)
@@ -1897,9 +1900,11 @@ def Cazuri(caz: str,mistake:float, imux: float):
         wait(100)
         RobotCompas(70, 88, STANGA, 0, 1, 1, 0)
         wait(100)
-        LFEncoderSA(60,11*cm,0.7,2,3,5,"red",1,0,0)
-        MSGandCLOSE(50,9*cm,0,0,0,0,60)
-        MSGandCLOSE(50,13*cm,0,1,1,45,-60)
+        SquaringWhiteSA(60,35,5,"red",1,0,0)
+        MoveSyncGyro(60,5*cm,0,0,0)
+        LFEncoderSA(60,14.5*cm,0.7,2,3,5,"red",0,0,0)
+        MSGandCLOSE(42,8.5*cm,0,0,0,0,70)
+        MSGandCLOSE(42,11*cm,0,1,1,35,-80)
         MoveSyncGyro(-80,15*cm,0,1,1)
         RobotCompas(-80,88,STANGA,0,0,0,0)
         MoveTime(-70,0.5,0,1)
@@ -1942,67 +1947,93 @@ def Cazuri(caz: str,mistake:float, imux: float):
         wait(100)
         MoveTime(-70,1,0,1)
     elif caz == "diagonal":
-        MoveSyncGyro(80,3.5*cm,1,1,1)
-        wait(100)
-        RobotCompas(70, 87, STANGA, 0, 1, 1, 5)
-        wait(100)
-        LFEncoderSA(50,8*cm,3,5,"red",1,0,0)
-        SquaringWhiteSA(50,30,4,"blue",0,0,1)
-        wait(100)
-        run_task(clawGoTo(CLOSED,1,0,500))
-        wait(100)
-        SMove(-90,90,DREAPTA,0,1,1,15)
-        wait(100)
-        MSGandCLOSE(70,21*cm,1,1,1,-20)
-        wait(100)
-        run_task(clawGoTo(OPEN-90,0.5,0,500))
-        wait(100)
-        MoveSyncGyro(-80,20*cm,1,1,1)
-        wait(100)
-        SMove(85,52,STANGA,0,1,1,10)
-        wait(100)
-        MoveSyncGyro(75,11*cm,1,1,1)
-        run_task(clawGoTo(CLOSED,1,0,500))
-        wait(100)
-        MoveSyncGyro(-80,21*cm,1,1,1)
-        wait(100)
-        run_task(
-            multitask(
-                clawGoTo(OPEN-90,1,0,450),
-                liftGoTo(UP,2,0,550)
-            )
-        )
-        wait(100)
-        MoveSyncGyro(80,11*cm,1,1,1)
-        wait(100)
-        run_task(
-                liftGoTo(DOWN,1.5,0,500)
-        )
-        wait(100)
-        RobotSpin(70,15,DREAPTA,1,0,0,1)
-        wait(100)
-        MoveSyncGyro(70,10*cm,1,1,1)
-        wait(100)
-        run_task(clawGoTo(CLOSED,1,0,500))
-        wait(100)
-        MoveSyncGyro(-70,10*cm,1,1,1)
-        wait(100)
-        RobotSpin(70,30,STANGA,1,0,0,1)
-        wait(100)
-        run_task(clawGoTo(OPEN-100,1,0,500))
-        wait(100)
-        MoveSyncGyro(70,10*cm,1,1,1)
-        wait(100)
-        run_task(clawGoTo(CLOSED,1,0,500))
-        wait(100)
-        RobotSpin(70,15,DREAPTA,1,0,0,1)
-        wait(100)
-        MoveSyncGyro(-75,30*cm,0,0,1)
-        wait(100)
-        RobotCompas(-80,89,STANGA,0,1,1,0)
-        wait(100)
-        MoveSyncGyro(-75,5*cm,0,0,1)
-        MoveTime(-85,0.3,0,1)
+        experimental = "on"
+        if experimental == "on":
+            run_task(clawGoTo(-82,1,0,500))
+            MoveSyncGyro(90,18*cm,1,1,1)
+            wait(100)
+            RobotSpin(85,89,STANGA,1,0,1,1,5)
+            wait(200)
+            SquaringWhiteSA(60,35,5,"red",1,0,0)
+            MSGandCLOSE(70,28*cm,0,1,1,0,40)
+            wait(100)
+            MSGandCLOSE(45,7*cm,0,1,1,0,-40)
+            run_task(clawGoTo(CLOSED,1,0,500))
+            MoveSyncGyro(-90,12*cm,1,1,1)
+            wait(100)
+            run_task(clawGoTo(-84,1,0,500))
+            MoveSyncGyro(-90,9*cm,1,1,1)
+            wait(100)
+            RobotSpin(90,15,STANGA,1,0,1,1,5)
+            wait(100)
+            MoveSyncGyro(60,15*cm,1,1,1)
+            run_task(clawGoTo(CLOSED,0.6,0,600))
+            run_task(liftGoTo(UP,1.3,1,550))
+            MoveSyncGyro(-90,9*cm,1,0,0)
+            MSGandCLOSE(-90,12*cm,0,1,1,0,-45)
+            run_task(clawGoTo(-86,1,0,500))
+            run_task(liftGoTo(UP,1.3,1,550))
+            MoveSyncGyro(80,7*cm,1,1,1)
+            run_task(liftGoTo(DOWN,1.2,1,550))
+            MoveSyncGyro(80,9*cm,1,1,1)
+            RobotSpin(90,9,STANGA,1,0,1,1,5)
+            wait(100)
+            MoveSyncGyro(60,9*cm,1,1,1)
+            run_task(clawGoTo(CLOSED,1,0,500))
+            RobotSpin(90,26,DREAPTA,1,0,1,1)
+            wait(100)
+            MoveSyncGyro(-90,17*cm,1,1,1)
+            wait(100)
+            RobotSpin(90,90,DREAPTA,1,0,1,1)
+            wait(100)
+            MoveTime(-75,1,0,1)
+        else:
+            run_task(clawGoTo(-85,1,0,500))
+            MoveSyncGyro(80,18*cm,1,1,1)
+            wait(100)
+            RobotSpin(80,89,STANGA,1,0,1,1,5)
+            wait(200)
+            MoveSyncGyro(80,24*cm,1,1,1)
+            wait(100)
+            run_task(clawGoTo(CLOSED,1,0,500))
+            wait(100)
+            MoveSyncGyro(-80,4*cm,1,1,1)
+            run_task(clawGoTo(-85,1,0,500))
+            run_task(liftGoTo(UP,1.3,1,550))
+            MoveSyncGyro(80,7*cm,1,1,1)
+            run_task(liftGoTo(DOWN,1.2,1,550))
+            MoveSyncGyro(80,4*cm,1,1,1)
+            run_task(clawGoTo(CLOSED,1,0,500))
+            wait(100)
+            MoveSyncGyro(-90,10*cm,1,1,1)
+            wait(100)
+            run_task(clawGoTo(-80,1,0,500))
+            MoveSyncGyro(-90,9*cm,1,1,1)
+            wait(100)
+            RobotSpin(80,15,STANGA,1,0,1,1)
+            wait(100)
+            MoveSyncGyro(55,15*cm,1,1,1)
+            run_task(clawGoTo(CLOSED,0.6,0,600))
+            run_task(liftGoTo(UP,1.3,1,550))
+            MoveSyncGyro(-90,21*cm,1,1,1)
+            wait(100)
+            run_task(liftGoTo(DOWN,1.2,1,550))
+            run_task(clawGoTo(-88,1,0,500))
+            run_task(liftGoTo(UP,1.3,1,550))
+            MoveSyncGyro(70,7*cm,1,1,1)
+            run_task(liftGoTo(DOWN,1.2,1,550))
+            MoveSyncGyro(70,9*cm,1,1,1)
+            RobotSpin(65,9,STANGA,1,0,1,8)
+            wait(100)
+            MoveSyncGyro(60,9*cm,1,1,1)
+            run_task(clawGoTo(CLOSED,1,0,500))
+            RobotSpin(90,26,DREAPTA,1,0,1,1)
+            wait(100)
+            MoveSyncGyro(-90,17*cm,1,1,1)
+            wait(100)
+            RobotSpin(90,90,DREAPTA,1,0,1,1)
+            wait(100)
+            MoveTime(-75,1,0,1)
     #endif
 #end Cazuri
     
@@ -2035,5 +2066,5 @@ def ReadCubes(coords:tuple):
         # print(f"Closest block to ({x:3}, {y:3}): sig={closest_sig}")
     return closest_sig
 
-
-print(f"NU MAI COMPILA FUNCTIILE")
+if __name__ == "__main__":
+    print(f"NU MAI COMPILA FUNCTIILE")

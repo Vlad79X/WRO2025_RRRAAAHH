@@ -1,3 +1,2 @@
-from centy_Library import *
-
-print(f"battery voltage : {Brick.battery.voltage()}")
+from pybricks.hubs import InventorHub
+print(f"battery voltage : {InventorHub().battery.voltage()}")
