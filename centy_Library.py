@@ -54,7 +54,7 @@ wheelSensorDistance = const(11) * cm
 V0 = const(48)
 Vmax = const(94)
 V0rot = const(42)
-V0comp = const(45)
+V0comp = const(46)
 V0arc = const(62)
 
 #Acceleratie si deceleratie mers fata spate
@@ -67,7 +67,7 @@ DecelerationEncoderRot = const(50)
 
 #Acceleratie si deceleratie compas
 AccelerationEncoderComp = const(10)
-DecelerationEncoderComp = const(50)
+DecelerationEncoderComp = const(35)
 
 #Acceleratie si deceleratie compas
 AccelerationEncoderCompM = const(20)
@@ -1855,7 +1855,7 @@ def GetSwitchesAndCase(cub1:int,cub2:int,cub3:int,cub4:int):
 
 def SwitchLefttoRight():
     imux = Brick.imu.rotation(TopAxis)
-    run_task(clawGoTo(OPEN-30,1,0,500))
+    run_task(clawGoTo(OPEN-20,1,0,500))
     MoveSyncGyro(-80,10*cm,1,1,1)
     wait(100)
     RobotCompas(80,15,DREAPTA,0,1,1,10)
@@ -1867,7 +1867,7 @@ def SwitchLefttoRight():
     wait(100)
     RobotCompas(80,30,STANGA,0,1,1,10)
     wait(100)
-    run_task(clawGoTo(OPEN-30,1,0,500))
+    run_task(clawGoTo(OPEN-20,1,0,500))
     MoveSyncGyro(80,11*cm,1,1,1)
     run_task(clawGoTo(CLOSED,1.2,0,500))
     wait(100)
