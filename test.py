@@ -26,4 +26,14 @@ cub4 = 2
 
 switchleftright1,switchleftright2,switchinsideoutside,caz = GetSwitchesAndCase(cub1,cub2,cub3,cub4)
 
-Cazuri("diagonal",0,imux)
+run_task(clawGoTo(OPEN,1,0,450))
+MSGandCLOSE(70,14*cm,1,1,1,40)
+wait(200)
+MoveSyncGyro(-70,14*cm,1,1,1)
+wait(100)
+RobotSpin(90,91,STANGA)
+wait(50)
+MoveSyncGyro(90,80*cm,1,1,1)
+run_task(clawGoTo(OPEN,1,0,450))
+MoveSyncGyro(-90,80*cm,1,1,1)
+RobotCompas(-80,89.5,STANGA,0,1,1,10)
